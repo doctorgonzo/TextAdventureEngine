@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ea411ae8e0b3a4bb96f93b2377eca1, type: 3}
+  m_Name: Sixth Room
+  m_EditorClassIdentifier: 
+  description: Welcome to the sixth room! Talk to the character here and try out
+    the connect four minigame!
+  exits:
+  - direction: west
+    destination: {fileID: 11400000, guid: 4b23eb0cdb6f91343aabbb5f3e86f599, type: 2}
+    isLocked: 0
+    keyToUnlock: {fileID: 0}
+    lockedDescription: 
+    isHidden: 0
+    exitAction: 0
+    deathMessage: 
+    blockingItem: {fileID: 0}
+    blockedMessage: 
+    targetLocation: {fileID: 0}
+    itemsToReveal: []
+    stateChangeMessage: 
+  - direction: north
+    destination: {fileID: 11400000, guid: 669fa180096989c43b526029ab5ff9c9, type: 2}
+    isLocked: 0
+    keyToUnlock: {fileID: 0}
+    lockedDescription: 
+    isHidden: 0
+    exitAction: 4
+    deathMessage: 
+    blockingItem: {fileID: 0}
+    blockedMessage: 
+    targetLocation: {fileID: 11400000, guid: 4b23eb0cdb6f91343aabbb5f3e86f599, type: 2}
+    itemsToReveal:
+    - {fileID: 11400000, guid: 0c43cb14270ea684cb72ffdd0e6a2fd3, type: 2}
+    stateChangeMessage: An item has appeared in the fifth room!
+  itemsInLocation: []
+  interactables: []
+  charactersInLocation:
+  - {fileID: 11400000, guid: be05f9b14892b084abf974cd0ac2bcb2, type: 2}
+  backgroundMusic: {fileID: 0}
+  defaultEnemies: []
+  isShop: 0
+  shopInventory: []
+  editorPosition: {x: 250, y: 200}

@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 863358238fe10d444a663cdc55b04242, type: 3}
+  m_Name: Clogged Toilet
+  m_EditorClassIdentifier: 
+  noun: toilet
+  description: A clogged toilet burbles and overflows in one corner.
+  detailedDescription: A literal pile of shit.
+  initialState: broken
+  interactions:
+  - interactionVerb: 
+    requiredState: broken
+    requiredItem: {fileID: 11400000, guid: 15f238ef27853864bb65ca4ba2b720f5, type: 2}
+    effects:
+    - effectType: 0
+      stringParameter: You attach the handle to the toilet. It looks like it can
+        be flushed now.
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+    - effectType: 1
+      stringParameter: 
+      newStateParameter: fixed
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+    - effectType: 6
+      stringParameter: 
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+  - interactionVerb: flush
+    requiredState: fixed
+    requiredItem: {fileID: 0}
+    effects:
+    - effectType: 0
+      stringParameter: You flush the toilet...
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+    - effectType: 1
+      stringParameter: 
+      newStateParameter: flushed
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+    - effectType: 3
+      stringParameter: south
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}

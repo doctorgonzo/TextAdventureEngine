@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 863358238fe10d444a663cdc55b04242, type: 3}
+  m_Name: Button
+  m_EditorClassIdentifier: 
+  noun: button
+  description: A large red button protrudes ominously from the wall.
+  detailedDescription: On closer inspection, the button is indeed large and red.
+  initialState: unpressed
+  interactions:
+  - interactionVerb: push
+    requiredState: unpressed
+    requiredItem: {fileID: 0}
+    effects:
+    - effectType: 0
+      stringParameter: You pressed the button!
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+    - effectType: 4
+      stringParameter: 
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 11400000, guid: 8f9fb152f328ed04b8ba50544313f787, type: 2}
+      audioClipParameter: {fileID: 0}

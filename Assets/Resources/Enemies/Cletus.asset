@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94ccbf3f52d16fb47b819b28a661b58e, type: 3}
+  m_Name: Cletus
+  m_EditorClassIdentifier: 
+  enemyName: Cletus
+  description: An enraged-looking Cletus stands here.
+  detailedDescription: 
+  xpReward: 30
+  maxHealth: 55
+  baseAttack: 8
+  damageVariance: 5
+  evasionChance: 0.1
+  behavior: {fileID: 11400000, guid: 975d7db00a7873e4595a41da3243b3cf, type: 2}
+  attacksOnSight: 1
+  lootDrops: []
+  exitDirectionToReveal: west

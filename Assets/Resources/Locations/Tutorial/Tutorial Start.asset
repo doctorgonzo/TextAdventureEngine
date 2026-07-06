@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ea411ae8e0b3a4bb96f93b2377eca1, type: 3}
+  m_Name: Tutorial Start
+  m_EditorClassIdentifier: 
+  description: "Type help or ? for a list of all available commands. Use the spacebar
+    to skip the typing effect and instantly display text. \n\nYou wake up in the
+    woods. A path leads off to the north."
+  exits:
+  - direction: north
+    destination: {fileID: 11400000, guid: 07ef7af75eb5e1549872861846befb73, type: 2}
+    isLocked: 0
+    keyToUnlock: {fileID: 0}
+    lockedDescription: 
+    isHidden: 0
+    exitAction: 0
+    deathMessage: 
+    blockingItem: {fileID: 0}
+    blockedMessage: 
+    targetLocation: {fileID: 0}
+    itemsToReveal: []
+    stateChangeMessage: 
+  itemsInLocation: []
+  interactables: []
+  charactersInLocation: []
+  backgroundMusic: {fileID: 0}
+  defaultEnemies: []
+  isShop: 0
+  shopInventory: []
+  editorPosition: {x: 0, y: 400}

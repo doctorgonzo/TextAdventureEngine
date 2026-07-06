@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8afdf457dddfa2d439f586c44b27abd2, type: 3}
+  m_Name: Flannel Shirt
+  m_EditorClassIdentifier: 
+  itemName: flannel
+  pickupSound: {fileID: 0}
+  descriptionInRoom: A cozy-looking flannel shirt sits neatly folded.
+  description: A green flannel shirt.
+  itemType: 2
+  attackBonus: 0
+  defenseBonus: 5
+  strengthBonus: 0
+  agilityBonus: 0
+  staminaBonus: 0
+  healthToRestore: 0
+  drunkennessValue: 0
+  effectToApplyOnUse: {fileID: 0}
+  buyPrice: 20
+  sellPrice: 10

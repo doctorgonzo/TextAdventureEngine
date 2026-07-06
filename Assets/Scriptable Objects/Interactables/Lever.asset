@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 863358238fe10d444a663cdc55b04242, type: 3}
+  m_Name: Lever
+  m_EditorClassIdentifier: 
+  noun: lever
+  description: A lever is set into the wall.
+  detailedDescription: The lever is rusty and stuck in place.
+  initialState: stuck
+  interactions:
+  - interactionVerb: 
+    requiredState: stuck
+    requiredItem: {fileID: 11400000, guid: 471a115debb064a42abbc953d685161e, type: 2}
+    effects:
+    - effectType: 0
+      stringParameter: You lube the lever liberally. It votes Kamala.
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+    - effectType: 1
+      stringParameter: 
+      newStateParameter: oiled
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+  - interactionVerb: pull
+    requiredState: oiled
+    requiredItem: {fileID: 0}
+    effects:
+    - effectType: 0
+      stringParameter: You pull the lever and reveal a hidden exit!
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}
+    - effectType: 3
+      stringParameter: west
+      newStateParameter: 
+      flagParameter: 
+      itemParameter: {fileID: 0}
+      audioClipParameter: {fileID: 0}

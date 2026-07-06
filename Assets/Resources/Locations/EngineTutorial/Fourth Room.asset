@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ea411ae8e0b3a4bb96f93b2377eca1, type: 3}
+  m_Name: Fourth Room
+  m_EditorClassIdentifier: 
+  description: 'Welcome to the fourth room! Here you will find two shopkeepers. One
+    for Items and one for Skills. ''Talk to'' each of them. '
+  exits:
+  - direction: north
+    destination: {fileID: 11400000, guid: 4b23eb0cdb6f91343aabbb5f3e86f599, type: 2}
+    isLocked: 0
+    keyToUnlock: {fileID: 0}
+    lockedDescription: 
+    isHidden: 0
+    exitAction: 0
+    deathMessage: 
+    blockingItem: {fileID: 0}
+    blockedMessage: 
+    targetLocation: {fileID: 0}
+    itemsToReveal: []
+    stateChangeMessage: 
+  itemsInLocation: []
+  interactables: []
+  charactersInLocation:
+  - {fileID: 11400000, guid: 3d753b25f3ea99148adbe14c17cdf339, type: 2}
+  - {fileID: 11400000, guid: 7857b5afea53d0b4a8feb60324f78f2a, type: 2}
+  backgroundMusic: {fileID: 0}
+  defaultEnemies: []
+  isShop: 1
+  shopInventory:
+  - {fileID: 11400000, guid: 00afe82ed366d6044bf03e6fae386b7c, type: 2}
+  - {fileID: 11400000, guid: a1804b078f0db2a499d7edfa6657db74, type: 2}
+  - {fileID: 11400000, guid: 4dbbf492f9dc2bb4eaaaa3be848e0795, type: 2}
+  editorPosition: {x: 250, y: 0}

@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c570285006a6faa4d82ec2910c3f9ba6, type: 3}
+  m_Name: Poison
+  m_EditorClassIdentifier: 
+  effectName: Poison
+  effectType: 0
+  magnitude: 5
+  durationInSeconds: 15
+  tickInterval: 5
+  applicationMessage: You feel the sting of poison!
+  effectMessage: Poison courses through your veins...
+  chanceToApply: 1

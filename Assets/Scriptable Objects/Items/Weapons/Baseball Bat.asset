@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8afdf457dddfa2d439f586c44b27abd2, type: 3}
+  m_Name: Baseball Bat
+  m_EditorClassIdentifier: 
+  itemName: bat
+  pickupSound: {fileID: 0}
+  descriptionInRoom: A wooden baseball bat sits against a tree.
+  description: A well-used wood bat.
+  itemType: 1
+  attackBonus: 5
+  defenseBonus: 0
+  strengthBonus: 0
+  agilityBonus: 0
+  staminaBonus: 0
+  healthToRestore: 0
+  drunkennessValue: 0
+  effectToApplyOnUse: {fileID: 0}
+  buyPrice: 10
+  sellPrice: 5

@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ea411ae8e0b3a4bb96f93b2377eca1, type: 3}
+  m_Name: First Room
+  m_EditorClassIdentifier: 
+  description: This is the very first room! In it you will find a button. Try using
+    'push button'. All other commands can be viewed by typing help or ?. Try it now!
+  exits:
+  - direction: north
+    destination: {fileID: 11400000, guid: 1e623319d490c5e40899c902e2e745cc, type: 2}
+    isLocked: 0
+    keyToUnlock: {fileID: 0}
+    lockedDescription: 
+    isHidden: 0
+    exitAction: 0
+    deathMessage: 
+    blockingItem: {fileID: 0}
+    blockedMessage: 
+    targetLocation: {fileID: 0}
+    itemsToReveal: []
+    stateChangeMessage: 
+  itemsInLocation: []
+  interactables:
+  - {fileID: 11400000, guid: 1c433c4ca848b8643a0ffad0f55e83ba, type: 2}
+  charactersInLocation: []
+  backgroundMusic: {fileID: 0}
+  defaultEnemies: []
+  isShop: 0
+  shopInventory: []
+  editorPosition: {x: 250, y: 400}

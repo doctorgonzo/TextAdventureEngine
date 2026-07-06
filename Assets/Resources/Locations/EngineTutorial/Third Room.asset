@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ea411ae8e0b3a4bb96f93b2377eca1, type: 3}
+  m_Name: Third Room
+  m_EditorClassIdentifier: 
+  description: 'This is the third room. Here you will find a bat and a flannel on
+    the ground. ''Take'' both items and then try ''Wear flannel'' and ''Equip bat''.
+    Try typing ''Char'' or ''Character'' to see your character sheet.
+
+
+    Then
+    try ''Attack Doc'' until you have defeated your first enemy! After that, ''Use''
+    the blue key.'
+  exits:
+  - direction: east
+    destination: {fileID: 11400000, guid: 1e623319d490c5e40899c902e2e745cc, type: 2}
+    isLocked: 0
+    keyToUnlock: {fileID: 0}
+    lockedDescription: 
+    isHidden: 0
+    exitAction: 0
+    deathMessage: 
+    blockingItem: {fileID: 0}
+    blockedMessage: 
+    targetLocation: {fileID: 0}
+    itemsToReveal: []
+    stateChangeMessage: 
+  - direction: west
+    destination: {fileID: 11400000, guid: 65bce2794d4a9294caadb428fbc8b6c4, type: 2}
+    isLocked: 1
+    keyToUnlock: {fileID: 11400000, guid: 7af54cc4a931dd541ac2a17f78b06125, type: 2}
+    lockedDescription: Locked with a blue lock.
+    isHidden: 0
+    exitAction: 0
+    deathMessage: 
+    blockingItem: {fileID: 0}
+    blockedMessage: 
+    targetLocation: {fileID: 0}
+    itemsToReveal: []
+    stateChangeMessage: 
+  itemsInLocation:
+  - {fileID: 11400000, guid: 00afe82ed366d6044bf03e6fae386b7c, type: 2}
+  - {fileID: 11400000, guid: b324c148ffbe57341a8afe748631aed7, type: 2}
+  interactables: []
+  charactersInLocation: []
+  backgroundMusic: {fileID: 0}
+  defaultEnemies:
+  - {fileID: 11400000, guid: 7fb07a4a27be86d41bfeb466776d8881, type: 2}
+  isShop: 0
+  shopInventory: []
+  editorPosition: {x: 500, y: 200}

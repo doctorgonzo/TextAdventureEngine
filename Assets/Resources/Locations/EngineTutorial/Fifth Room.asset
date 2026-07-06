@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ea411ae8e0b3a4bb96f93b2377eca1, type: 3}
+  m_Name: Fifth Room
+  m_EditorClassIdentifier: 
+  description: Welcome to the fifth room! Here we'll demonstrate a blocking object
+    type of quest. Pick up the item in the room and try to exit to the east. Drop
+    the item to continue.
+  exits:
+  - direction: south
+    destination: {fileID: 11400000, guid: 65bce2794d4a9294caadb428fbc8b6c4, type: 2}
+    isLocked: 0
+    keyToUnlock: {fileID: 0}
+    lockedDescription: 
+    isHidden: 0
+    exitAction: 0
+    deathMessage: 
+    blockingItem: {fileID: 0}
+    blockedMessage: 
+    targetLocation: {fileID: 0}
+    itemsToReveal: []
+    stateChangeMessage: 
+  - direction: east
+    destination: {fileID: 11400000, guid: f98a99f5e50717140b6d549f41e17af3, type: 2}
+    isLocked: 0
+    keyToUnlock: {fileID: 0}
+    lockedDescription: 
+    isHidden: 0
+    exitAction: 3
+    deathMessage: 
+    blockingItem: {fileID: 11400000, guid: 7a82fdb1ddebb7a488bff91eaed1f376, type: 2}
+    blockedMessage: The red key doesn't want to leave...
+    targetLocation: {fileID: 0}
+    itemsToReveal: []
+    stateChangeMessage: 
+  itemsInLocation:
+  - {fileID: 11400000, guid: 7a82fdb1ddebb7a488bff91eaed1f376, type: 2}
+  interactables: []
+  charactersInLocation: []
+  backgroundMusic: {fileID: 0}
+  defaultEnemies: []
+  isShop: 0
+  shopInventory: []
+  editorPosition: {x: 0, y: 0}

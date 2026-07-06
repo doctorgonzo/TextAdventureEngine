@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1cd6dc50d7727fb4b8592e4a9f19522f, type: 3}
+  m_Name: Shopkeeper
+  m_EditorClassIdentifier: 
+  characterName: Shopkeeper
+  descriptionInRoom: A Shopkeeper is here.
+  detailedDescription: A surly-looking gentleman.
+  startingDialogue: {fileID: 11400000, guid: 6bc6fe1776baab043802280fbe4c7db5, type: 2}
+  becomesEnemy: {fileID: 0}
+  skillsToTeach: []

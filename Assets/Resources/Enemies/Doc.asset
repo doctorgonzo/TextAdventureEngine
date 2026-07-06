@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 94ccbf3f52d16fb47b819b28a661b58e, type: 3}
+  m_Name: Doc
+  m_EditorClassIdentifier: 
+  enemyName: Doc
+  description: A surly looking Doc stands here.
+  detailedDescription: 250 pounds of angsty, angry man.
+  xpReward: 42
+  maxHealth: 42
+  baseAttack: 10
+  damageVariance: 4
+  evasionChance: 0.256
+  behavior: {fileID: 11400000, guid: 5c7c866c046aeb9438aa995235e091ad, type: 2}
+  attacksOnSight: 1
+  lootDrops:
+  - {fileID: 11400000, guid: 7af54cc4a931dd541ac2a17f78b06125, type: 2}
+  - {fileID: 11400000, guid: 8f9fb152f328ed04b8ba50544313f787, type: 2}
+  exitDirectionToReveal: 
