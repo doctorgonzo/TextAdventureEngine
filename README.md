@@ -4,6 +4,8 @@ A data-driven engine for building parser-style text adventure games in **Unity 6
 
 The player types natural commands (`go north`, `take the lantern`, `use key on door`, `attack goblin`, `talk to merchant`) into a terminal-style UI with a typewriter effect, colorized output, and live keyword highlighting.
 
+📖 **[Full manual](Assets/TextAdventureEngine/Documentation/Manual.md)** · 📋 **[Changelog](CHANGELOG.md)**
+
 ---
 
 ## Features
@@ -130,7 +132,8 @@ One `EngineSettings` asset, assigned to the `GameController`, controls:
 - **Create Game Scene** (`Tools ▸ Text Engine ▸ Create Game Scene`) — one-click scene setup: builds and wires the full UI + engine rig so a fresh project is playable immediately.
 - **Content Validator** (`Tools ▸ Text Engine ▸ Validate Content`) — one-click audit of every content asset: broken exit destinations, locked doors without keys, dialogue actions missing their item/quest, out-of-range quest objectives, flags missing from the registry, assets outside `Resources/` (invisible to the engine), and duplicate asset names (which collide in the name-keyed save system). Results are ranked by severity with click-to-ping.
 - **World Map Graph Editor** (`Window ▸ World Map Graph Editor`) — a visual node graph of every location. Drag from a room's compass port into another room's *Entrance* to create an exit; the reciprocal exit is auto-created but independently deletable (so one-way passages are easy). Right-drag to pan, `Ctrl+A` to auto-arrange, toolbar buttons to create locations.
-- **Flag Inspector** (`Window ▸ Flag Inspector`) — view and toggle all world flags at runtime for testing.
+- **Dialogue Graph Editor** (`Window ▸ Dialogue Graph Editor`) — branching conversations on a canvas: every dialogue node as a graph node with **inline text editing**, one-click "+ Response" authoring, drag-to-link response and failure ports, entry-node badges showing which character starts there, per-conversation auto-arrange, and full Undo.
+- **Flag Inspector** (`Window ▸ Flag Inspector`) — view and toggle all world flags live at runtime for testing.
 - **Scenario Loader** (`Window ▸ Scenario Loader`) — jump the running game to a defined starting scenario.
 - **Custom inspectors** for characters, enemies, locations, and dialogue nodes — the dialogue inspector offers flag dropdowns (fed by the Flag Registry) and a one-click *"Create & Link New Node"* button for building trees fast.
 

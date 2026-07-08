@@ -101,7 +101,7 @@ namespace TextEngine.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Created and assigned new EnemyBehavior at: {assetPath}");
+            Debug.Log($"[Text Engine] Created and assigned new EnemyBehavior at: {assetPath}");
         }
 
         private void CreateAndAddAsset<T>(Object targetObject, string listPropertyName) where T : ScriptableObject
@@ -129,7 +129,7 @@ namespace TextEngine.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Created '{assetPath}' and added it to the '{listPropertyName}' list on '{targetObject.name}'.");
+            Debug.Log($"[Text Engine] Created '{assetPath}' and added it to the '{listPropertyName}' list on '{targetObject.name}'.");
         }
     }
 }

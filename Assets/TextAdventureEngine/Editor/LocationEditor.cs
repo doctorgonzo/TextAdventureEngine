@@ -130,7 +130,7 @@ namespace TextEngine.EditorTools
             EditorUtility.SetDirty(target);
             Repaint();
 
-            Debug.Log($"Created '{assetPath}' and added it to the list.");
+            Debug.Log($"[Text Engine] Created '{assetPath}' and added it to the list.");
         }
 
 
@@ -184,7 +184,7 @@ namespace TextEngine.EditorTools
             AssetDatabase.SaveAssets();
 
             targetExitProperty.objectReferenceValue = newLocation;
-            Debug.Log($"Created new Location at '{assetPath}' and assigned it.");
+            Debug.Log($"[Text Engine] Created new Location at '{assetPath}' and assigned it.");
         }
     }
 }

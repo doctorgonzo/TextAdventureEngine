@@ -68,7 +68,7 @@ namespace TextEngine.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"Created new Enemy '{newEnemy.name}' at '{assetPath}' and linked it to Character '{character.name}'.");
+            Debug.Log($"[Text Engine] Created new Enemy '{newEnemy.name}' at '{assetPath}' and linked it to Character '{character.name}'.");
         }
     }
 }

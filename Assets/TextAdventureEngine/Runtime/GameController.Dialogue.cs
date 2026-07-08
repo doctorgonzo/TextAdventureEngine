@@ -104,7 +104,7 @@ namespace TextEngine
             foreach (string flag in currentDialogueNode.flagsToSet)
             {
                 worldFlags[flag] = true;
-                Debug.Log($"FLAG SET: {flag} = true"); // For debugging
+                if (engineSettings.verboseLogging) Debug.Log($"[Text Engine] Flag set: {flag} = true");
             }
             // A node with no player responses is terminal. End the conversation
             // here — otherwise the game stays in Dialogue state with no valid

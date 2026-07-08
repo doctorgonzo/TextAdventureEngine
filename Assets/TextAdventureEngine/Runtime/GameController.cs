@@ -181,8 +181,10 @@ namespace TextEngine
             allCustomActions = Resources.LoadAll<CustomAction>("Actions/Custom");
             allSkills = Resources.LoadAll<Skill>("Skills");
             BuildVerbHandlers();
-            // Optional: Log a message to confirm everything loaded correctly.
-            Debug.Log($"Loaded {allActions.Length} actions and {allLocations.Length} locations.");
+            if (engineSettings.verboseLogging)
+            {
+                Debug.Log($"[Text Engine] Loaded {allActions.Length} actions, {allCustomActions.Length} custom actions, {allSkills.Length} skills, and {allLocations.Length} locations.");
+            }
         }
 
         void Start()

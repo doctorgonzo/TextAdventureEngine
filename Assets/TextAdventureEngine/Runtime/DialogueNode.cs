@@ -21,5 +21,9 @@ namespace TextEngine
         [Header("Flag Conditions & Actions")]
         public List<string> requiredFlags = new List<string>(); // Player must have these flags set to TRUE to see this node
         public List<string> flagsToSet = new List<string>();    // These flags will be set to TRUE when this node is displayed
+
+        [Header("Editor")]
+        [Tooltip("Node position in the Dialogue Graph Editor. Managed by the tool.")]
+        public Vector2 editorPosition;
     }
 }

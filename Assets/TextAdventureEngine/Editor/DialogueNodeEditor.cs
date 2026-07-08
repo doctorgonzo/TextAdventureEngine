@@ -187,7 +187,7 @@ namespace TextEngine.EditorTools
             // 4. Link the new node back to the response property
             nextNodeProperty.objectReferenceValue = newNode;
 
-            Debug.Log($"Created and linked new DialogueNode at: {assetPath}");
+            Debug.Log($"[Text Engine] Created and linked new DialogueNode at: {assetPath}");
         }
     }
 }
