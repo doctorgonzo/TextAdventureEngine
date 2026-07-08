@@ -8,8 +8,10 @@ public partial class GameController
 {
     void HandleTalk(string nounPhrase)
     {
+        bool ambiguous;
         // First, try to find a friendly character with that name.
-        var characterToTalkTo = roomCharactersState[currentLocation].Find(c => c.characterName.ToLower() == nounPhrase);
+        var characterToTalkTo = FindByNoun(roomCharactersState[currentLocation], c => c.characterName, nounPhrase, out ambiguous);
+        if (ambiguous) return;
         if (characterToTalkTo != null)
         {
             if (characterToTalkTo.startingDialogue != null)
@@ -27,7 +29,8 @@ public partial class GameController
         else
         {
             // If no friendly character was found, check if an enemy with that name exists.
-            var targetEnemy = roomEnemiesState[currentLocation].Find(e => e.enemyBlueprint.enemyName.ToLower() == nounPhrase);
+            var targetEnemy = FindByNoun(roomEnemiesState[currentLocation], e => e.enemyBlueprint.enemyName, nounPhrase, out ambiguous);
+            if (ambiguous) return;
             if (targetEnemy != null)
             {
                 // If we find an enemy, give a specific, non-conversational response.
@@ -65,7 +68,7 @@ public partial class GameController
         if (currentDialogueNode.requiredItemForSuccess != null)
         {
             // If it does, check if the player actually has that item in their inventory.
-            if (!playerInventory.Contains(currentDialogueNode.requiredItemForSuccess))
+            if (!playerInventory.Any(inst => inst.blueprint == currentDialogueNode.requiredItemForSuccess))
             {
                 // Failure! If the player doesn't have the item, redirect to the failure node.
                 if (currentDialogueNode.failureNode != null)
@@ -101,6 +104,15 @@ public partial class GameController
             worldFlags[flag] = true;
             Debug.Log($"FLAG SET: {flag} = true"); // For debugging
         }
+        // A node with no player responses is terminal. End the conversation
+        // here — otherwise the game stays in Dialogue state with no valid
+        // input and soft-locks. Skip this if a node action already moved us
+        // to another state (shop, trainer, minigame, hostility).
+        if ((currentDialogueNode.playerResponses == null || currentDialogueNode.playerResponses.Length == 0)
+            && currentGameState == GameState.Dialogue)
+        {
+            EndDialogue();
+        }
     }
 
     private string ProcessNodeActions(DialogueNode node)
@@ -116,13 +128,15 @@ public partial class GameController
             switch (action.actionType)
             {
                 case DialogueActionType.GiveItem:
-                    playerInventory.Add(action.item);
-                    LogText($"You receive the <color={keywordColor}>{action.item.itemName}</color>.", TextType.GameResponse);
+                    TryGiveItem(action.item);
                     break;
                 case DialogueActionType.TakeItem:
-                    if (playerInventory.Contains(action.item))
+                    var heldInstance = action.item != null
+                        ? playerInventory.Find(inst => inst.blueprint == action.item)
+                        : null;
+                    if (heldInstance != null)
                     {
-                        playerInventory.Remove(action.item);
+                        playerInventory.Remove(heldInstance);
                         LogText($"You give the <color={keywordColor}>{action.item.itemName}</color>.", TextType.GameResponse);
                     }
                     break;
@@ -164,9 +178,18 @@ public partial class GameController
                     ActiveQuest questToUpdate = activeQuests.FirstOrDefault(q => q.quest == action.quest);
                     if (questToUpdate != null)
                     {
-                        // Mark the specified objective as complete
-                        questToUpdate.objectivesCompleted[action.objectiveIndex] = true;
-                        LogText($"Quest updated: {action.quest.questName}", TextType.GameResponse);
+                        // Mark the specified objective as complete. Guard the
+                        // index — a bad value in the DialogueAction asset must
+                        // not crash the conversation.
+                        if (action.objectiveIndex >= 0 && action.objectiveIndex < questToUpdate.objectivesCompleted.Count)
+                        {
+                            questToUpdate.objectivesCompleted[action.objectiveIndex] = true;
+                            LogText($"Quest updated: {action.quest.questName}", TextType.GameResponse);
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"UpdateQuest: objective index {action.objectiveIndex} is out of range for quest '{action.quest.questName}' ({questToUpdate.objectivesCompleted.Count} objectives).");
+                        }
                     }
                     break;
                 case DialogueActionType.CompleteQuest:
@@ -184,13 +207,9 @@ public partial class GameController
                         }
 
                         // Check for and grant item rewards
-                        if (questToComplete.quest.itemRewards.Count > 0)
+                        foreach (Item itemReward in questToComplete.quest.itemRewards)
                         {
-                            foreach (Item itemReward in questToComplete.quest.itemRewards)
-                            {
-                                playerInventory.Add(itemReward);
-                                LogText($"You receive the {itemReward.itemName}.", TextType.GameResponse);
-                            }
+                            TryGiveItem(itemReward);
                         }
                         GrantXp(questToComplete.quest.xpReward);
                     }

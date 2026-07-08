@@ -14,15 +14,17 @@ public class WorldState
     public Location[] allLocations;
     public Enemy[] allEnemies;
     public Item[] allItems;
+    public Quest[] allQuests;
+    public StatusEffect[] allStatusEffects;
 
     // --- Per-location runtime state ---
-    public Dictionary<Location, List<Item>> roomItemsState;
+    public Dictionary<Location, List<ItemInstance>> roomItemsState;
     public Dictionary<Exit, bool> exitLockedState;
     public Dictionary<Exit, bool> exitVisibilityState;
     public Dictionary<Interactable, string> interactableStates;
     public Dictionary<Location, List<EnemyInstance>> roomEnemiesState;
     public Dictionary<Location, List<Character>> roomCharactersState;
-    public Dictionary<Location, List<Item>> runtimeShopInventories;
+    public Dictionary<Location, List<ItemInstance>> runtimeShopInventories;
     public Dictionary<Location, List<Interactable>> roomInteractablesState;
     public Dictionary<string, bool> worldFlags = new Dictionary<string, bool>();
 
@@ -31,6 +33,8 @@ public class WorldState
         allLocations = Resources.LoadAll<Location>("Locations");
         allEnemies = Resources.LoadAll<Enemy>("Enemies");
         allItems = Resources.LoadAll<Item>("Items");
+        allQuests = Resources.LoadAll<Quest>("Quests");
+        allStatusEffects = Resources.LoadAll<StatusEffect>("Status Effects");
     }
 
     /// <summary>
@@ -64,13 +68,14 @@ public class WorldState
 
     void InstantiateShopStates()
     {
-        runtimeShopInventories = new Dictionary<Location, List<Item>>();
+        runtimeShopInventories = new Dictionary<Location, List<ItemInstance>>();
         foreach (Location location in allLocations)
         {
             if (location.isShop)
             {
-                // Create a NEW list, copying the items from the SO's default inventory.
-                List<Item> runtimeInventory = new List<Item>(location.shopInventory);
+                // Wrap each blueprint from the SO's default inventory in a runtime instance.
+                List<ItemInstance> runtimeInventory =
+                    location.shopInventory.Where(i => i != null).Select(i => new ItemInstance(i)).ToList();
                 runtimeShopInventories.Add(location, runtimeInventory);
             }
         }
@@ -109,11 +114,12 @@ public class WorldState
 
     void InstantiateRoomStates()
     {
-        roomItemsState = new Dictionary<Location, List<Item>>();
+        roomItemsState = new Dictionary<Location, List<ItemInstance>>();
         foreach (Location location in allLocations)
         {
-            // For each location blueprint, create a NEW list of items based on its blueprint.
-            List<Item> itemsInRoom = new List<Item>(location.itemsInLocation);
+            // For each location blueprint, create runtime instances of its default items.
+            List<ItemInstance> itemsInRoom =
+                location.itemsInLocation.Where(i => i != null).Select(i => new ItemInstance(i)).ToList();
             roomItemsState.Add(location, itemsInRoom);
         }
     }
@@ -159,18 +165,6 @@ public class WorldState
     {
         if (string.IsNullOrEmpty(name) || allItems == null) return null;
         return allItems.FirstOrDefault(item => item != null && item.name == name);
-    }
-
-    public Interactable FindInteractableByNoun(string noun)
-    {
-        foreach (Location loc in allLocations)
-        {
-            foreach (Interactable interactable in loc.interactables)
-            {
-                if (interactable.noun == noun) return interactable;
-            }
-        }
-        return null;
     }
 
     public Exit FindExit(Location loc, string direction)
@@ -219,6 +213,37 @@ public class WorldState
     {
         // This now uses the pre-loaded array, which is fast and reliable.
         return allEnemies.FirstOrDefault(e => e.name == name);
+    }
+
+    public Quest FindQuestByName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || allQuests == null) return null;
+        return allQuests.FirstOrDefault(q => q != null && q.name == name);
+    }
+
+    public StatusEffect FindStatusEffectByName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || allStatusEffects == null) return null;
+        return allStatusEffects.FirstOrDefault(e => e != null && e.name == name);
+    }
+
+    // Interactables are identified by location + asset name (not by noun alone),
+    // so two rooms can each have e.g. a "lever" without their saved state colliding.
+    public Location FindLocationOfInteractable(Interactable interactable)
+    {
+        if (interactable == null) return null;
+        foreach (Location loc in allLocations)
+        {
+            if (loc != null && loc.interactables != null && loc.interactables.Contains(interactable))
+                return loc;
+        }
+        return null;
+    }
+
+    public Interactable FindInteractableInLocation(Location location, string assetName)
+    {
+        if (location == null || location.interactables == null || string.IsNullOrEmpty(assetName)) return null;
+        return location.interactables.FirstOrDefault(i => i != null && i.name == assetName);
     }
     #endregion
 }

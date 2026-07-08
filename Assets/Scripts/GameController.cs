@@ -66,14 +66,14 @@ public partial class GameController : MonoBehaviour
     // world model without caring that WorldState now owns it. These return the
     // live collections by reference, so indexing, Add/Remove, and Clear all
     // operate on the real state.
-    private Dictionary<Location, List<Item>> roomItemsState => world.roomItemsState;
+    private Dictionary<Location, List<ItemInstance>> roomItemsState => world.roomItemsState;
     private Dictionary<Exit, bool> exitLockedState => world.exitLockedState;
     private Dictionary<Exit, bool> exitVisibilityState => world.exitVisibilityState;
     private Dictionary<Interactable, string> interactableStates => world.interactableStates;
     private Dictionary<Location, List<EnemyInstance>> roomEnemiesState => world.roomEnemiesState;
     private Dictionary<Location, List<Character>> roomCharactersState => world.roomCharactersState;
     private Dictionary<string, bool> worldFlags => world.worldFlags;
-    private Dictionary<Location, List<Item>> runtimeShopInventories => world.runtimeShopInventories;
+    private Dictionary<Location, List<ItemInstance>> runtimeShopInventories => world.runtimeShopInventories;
     private Dictionary<Location, List<Interactable>> roomInteractablesState => world.roomInteractablesState;
     private Location[] allLocations => world.allLocations;
     private Character activeConversationCharacter;
@@ -81,7 +81,7 @@ public partial class GameController : MonoBehaviour
     private Location previousLocation;
     private Location activeShop;
     private Action[] allActions;
-    private List<Item> playerInventory = new List<Item>();
+    private List<ItemInstance> playerInventory = new List<ItemInstance>();
     public List<ActiveQuest> activeQuests = new List<ActiveQuest>();
     public List<Quest> completedQuests = new List<Quest>();
     private List<ActiveStatusEffect> activeStatusEffects = new List<ActiveStatusEffect>();
@@ -90,14 +90,16 @@ public partial class GameController : MonoBehaviour
     private const string keywordColor = "#FF88FF"; // Magenta
     private const string enemyColor = "#FF8888";
     private DialogueNode currentDialogueNode;
-    private Item equippedWeapon;
-    private Item equippedArmor;
+    private ItemInstance equippedWeapon;
+    private ItemInstance equippedArmor;
     private List<string> commandHistory = new List<string>();
     private int historyIndex = 0;
     private const int C4_ROWS = 6;
     private const int C4_COLS = 7;
     private int[,] connectFourBoard;
     private bool isPlayerTurn = true;
+    // Display name of whoever the minigame was started against.
+    private string minigameOpponentName = "Your opponent";
     private bool isPlayerStunned = false;
     private List<Skill> learnedSkills = new List<Skill>();
     private Skill[] allSkills;
@@ -107,6 +109,15 @@ public partial class GameController : MonoBehaviour
     private CustomAction[] allCustomActions;
     private TextRenderer textRenderer;
     private SaveSystem saveSystem;
+    // Built-in verb keyword -> handler, built once in Awake. Each handler
+    // receives the (article-stripped, lowercased) noun phrase after the verb.
+    private Dictionary<string, System.Action<string>> verbHandlers;
+    // Single-letter shortcuts the parser expands before matching exit directions.
+    private static readonly Dictionary<string, string> directionAliases = new Dictionary<string, string>
+    {
+        { "n", "north" }, { "s", "south" }, { "e", "east" }, { "w", "west" },
+        { "u", "up" }, { "d", "down" }
+    };
 
     #region Game Events
     [System.Serializable]
@@ -153,6 +164,7 @@ public partial class GameController : MonoBehaviour
         allActions = Resources.LoadAll<Action>("Actions");
         allCustomActions = Resources.LoadAll<CustomAction>("Actions/Custom");
         allSkills = Resources.LoadAll<Skill>("Skills");
+        BuildVerbHandlers();
         // Optional: Log a message to confirm everything loaded correctly.
         Debug.Log($"Loaded {allActions.Length} actions and {allLocations.Length} locations.");
     }
@@ -261,7 +273,7 @@ public partial class GameController : MonoBehaviour
     {
         inputField.characterLimit = 0;
         currentGameState = GameState.Playing;
-        playerInventory = new List<Item>();
+        playerInventory = new List<ItemInstance>();
         equippedWeapon = null;
         equippedArmor = null;
         playerStats = new PlayerStats();
@@ -353,7 +365,7 @@ public partial class GameController : MonoBehaviour
                 string[] words = inputText.ToLower().Split(' ');
                 if (words[0] == "buy" && words.Length > 1)
                 {
-                    string skillName = string.Join(" ", words.Skip(1));
+                    string skillName = string.Join(" ", words.Skip(1).Where(w => w != "a" && w != "an" && w != "the"));
                     HandleBuySkill(skillName);
                 }
                 else if (words[0] == "leave")
@@ -372,13 +384,13 @@ public partial class GameController : MonoBehaviour
 
                 if (command == "buy" && words1.Length > 1)
                 {
-                    string itemName = string.Join(" ", words1.Skip(1));
+                    string itemName = string.Join(" ", words1.Skip(1).Where(w => w != "a" && w != "an" && w != "the"));
                     HandleBuy(itemName); // Your existing HandleBuy function
                     DisplayShopInventory(); // Refresh the shop view after the action
                 }
                 else if (command == "sell" && words1.Length > 1)
                 {
-                    string itemName = string.Join(" ", words1.Skip(1));
+                    string itemName = string.Join(" ", words1.Skip(1).Where(w => w != "a" && w != "an" && w != "the"));
                     HandleSell(itemName); // Your existing HandleSell function
                     DisplayShopInventory(); // Refresh the shop view
                 }
@@ -397,91 +409,126 @@ public partial class GameController : MonoBehaviour
         inputField.ActivateInputField();
     }
 
+    // Maps every built-in verb keyword to its handler. Action assets still
+    // control which keyword (and synonyms) the player can type; this table is
+    // what the resolved keyword dispatches to. Verbs with no entry here fall
+    // through to the data-driven CustomAction assets.
+    void BuildVerbHandlers()
+    {
+        verbHandlers = new Dictionary<string, System.Action<string>>
+        {
+            { "go", AttemptToMove },
+            { "look", p => HandleLook(StripLeadingWord(p, "at")) },
+            { "talk", p => HandleTalk(StripLeadingWord(p, "to")) },
+            { "use", HandleUseCommand },
+            { "take", HandleTake },
+            { "drop", HandleDrop },
+            { "push", p => HandleInteract("push", p) },
+            { "pull", p => HandleInteract("pull", p) },
+            { "flush", p => HandleInteract("flush", p) },
+            { "activate", p => HandleInteract("activate", p) },
+            { "attack", HandleAttack },
+            { "cast", HandleCast },
+            { "inventory", _ => HandleInventory() },
+            { "equip", HandleEquip },
+            { "unequip", HandleUnequip },
+            { "equipment", _ => HandleEquipment() },
+            { "save", _ => HandleSave() },
+            { "load", _ => HandleLoad() },
+            { "help", _ => HandleHelp() },
+            { "quests", _ => HandleQuests() },
+            { "status", _ => HandleStatus() },
+            { "char", _ => HandleChar() },
+            { "skills", HandleSkills },
+            { "learn", HandleLearnSkill },
+            { "balance", _ => HandleBalance() },
+            { "buy", HandleBuy },
+            { "sell", HandleSell },
+        };
+    }
+
+    // Removes a leading preposition, e.g. "look at chest" -> "chest".
+    static string StripLeadingWord(string phrase, string word)
+    {
+        if (phrase == word) return "";
+        return phrase.StartsWith(word + " ") ? phrase.Substring(word.Length + 1) : phrase;
+    }
+
+    // Splits "use <item> [on <target>]" into its two noun phrases.
+    void HandleUseCommand(string nounPhrase)
+    {
+        var parts = nounPhrase.Split(new[] { " on " }, 2, System.StringSplitOptions.None);
+        if (parts.Length == 2) HandleUse(parts[0], parts[1]);
+        else HandleUse(nounPhrase, null);
+    }
+
     public void ParsePlayerCommand(string inputText)
     {
         string[] words = inputText.ToLower().Split(' ');
         string verb = words[0];
+        // Resolve the typed verb (or a synonym) to an Action asset's keyword.
         string actionKeyword = null;
         foreach (Action action in allActions) { if (action.keyword.ToLower() == verb || action.synonyms.Contains(verb)) { actionKeyword = action.keyword.ToLower(); break; } }
-        if (actionKeyword == null) { LogText("I don't understand the word '" + verb + "'."); return; }
-        // The parser now tries to build noun phrases instead of single nouns.
-        // It consumes the words from the player's input.
-        List<string> remainingWords = new List<string>(words.Skip(1));
-        // Handle complex commands first
-        if (actionKeyword == "use")
+        // Build the noun phrase, dropping articles so "take the lantern" works.
+        string nounPhrase = string.Join(" ", words.Skip(1)
+            .Where(w => w != "a" && w != "an" && w != "the" && w.Length > 0));
+        if (actionKeyword != null && verbHandlers.TryGetValue(actionKeyword, out var handler))
         {
-            // Find the "on" keyword to split the two noun phrases
-            int onIndex = remainingWords.IndexOf("on");
-            if (onIndex != -1)
-            {
-                string nounPhrase1 = string.Join(" ", remainingWords.Take(onIndex));
-                string nounPhrase2 = string.Join(" ", remainingWords.Skip(onIndex + 1));
-                HandleUse(nounPhrase1, nounPhrase2);
-            }
-            else // Simple "use [item]"
-            {
-                string nounPhrase = string.Join(" ", remainingWords);
-                HandleUse(nounPhrase, null);
-            }
+            handler(nounPhrase);
+            return;
         }
-        else if (actionKeyword == "look" || actionKeyword == "talk")
+        // Not a built-in verb: check the data-driven CustomAction assets.
+        // Matching the raw verb too means a CustomAction works on its own,
+        // without also needing a mirror Action asset.
+        string keywordToMatch = actionKeyword ?? verb;
+        var customAction = allCustomActions.FirstOrDefault(a =>
+            a.keyword.ToLower() == keywordToMatch ||
+            a.synonyms.Any(s => s.ToLower() == verb));
+        if (customAction != null)
         {
-            // Find "at" or "to"
-            if (remainingWords.Count > 0 && (remainingWords[0] == "at" || remainingWords[0] == "to"))
-            {
-                remainingWords.RemoveAt(0); // Remove the preposition
-            }
-            string nounPhrase = string.Join(" ", remainingWords);
-            if (actionKeyword == "look") HandleLook(nounPhrase);
-            else if (actionKeyword == "talk") HandleTalk(nounPhrase);
+            HandleCustomAction(customAction, nounPhrase);
+            return;
         }
-        else // Simple "verb [noun phrase]" commands
+        LogText("I don't understand the word '" + verb + "'.");
+    }
+
+    // Resolves a player-typed noun phrase against a collection, preferring an
+    // exact (case-insensitive) name match, then names starting with the
+    // phrase, then names containing it. When the best tier holds more than one
+    // distinct name, prints a clarifying question and reports ambiguity so the
+    // caller can stop without printing its own "not found" message.
+    private T FindByNoun<T>(IEnumerable<T> source, System.Func<T, string> nameOf, string nounPhrase, out bool ambiguous)
+    {
+        ambiguous = false;
+        if (string.IsNullOrEmpty(nounPhrase) || source == null) return default;
+        string phrase = nounPhrase.ToLower();
+        var named = source.Where(x => x != null && !string.IsNullOrEmpty(nameOf(x))).ToList();
+        var matches = named.Where(x => nameOf(x).ToLower() == phrase).ToList();
+        if (matches.Count == 0)
+            matches = named.Where(x => nameOf(x).ToLower().StartsWith(phrase)).ToList();
+        if (matches.Count == 0)
+            matches = named.Where(x => nameOf(x).ToLower().Contains(phrase)).ToList();
+        if (matches.Count == 0) return default;
+        var distinctNames = matches.Select(nameOf).Distinct(System.StringComparer.OrdinalIgnoreCase).ToList();
+        if (distinctNames.Count > 1)
         {
-            string nounPhrase = string.Join(" ", remainingWords);
-            switch (actionKeyword)
-            {
-                case "go": AttemptToMove(nounPhrase); break;
-                case "take": HandleTake(nounPhrase); break;
-                case "drop": HandleDrop(nounPhrase); break;
-                case "push":
-                case "activate":
-                case "pull":
-                case "flush": HandleInteract(actionKeyword, nounPhrase); break;
-                case "attack": HandleAttack(nounPhrase); break;
-                case "cast" : HandleCast(nounPhrase); break;
-                case "inventory": HandleInventory(); break;
-                case "equip": HandleEquip(nounPhrase); break;
-                case "unequip": HandleUnequip(nounPhrase); break;
-                case "equipment": HandleEquipment(); break;
-                case "save": HandleSave(); break;
-                case "load": HandleLoad(); break;
-                case "help": HandleHelp(); break;
-                case "quests": HandleQuests();  break;
-                case "status": HandleStatus(); break;
-                case "char": HandleChar(); break;
-                case "skills": HandleSkills(nounPhrase); break;
-                case "learn": HandleLearnSkill(nounPhrase); break;
-                case "balance":  HandleBalance(); break;
-                case "buy": HandleBuy(nounPhrase); break;
-                case "sell": HandleSell(nounPhrase); break;
-                default:
-                    // If no hard-coded command was found, check if it's a Custom Action.
-                    var customAction = allCustomActions.FirstOrDefault(a => a.keyword.ToLower() == actionKeyword.ToLower() || a.synonyms.Any(s => s.ToLower() == actionKeyword.ToLower()));
-                    if (customAction != null)
-                    {
-                        HandleCustomAction(customAction, nounPhrase);
-                    }
-                    else
-                    {
-                        LogText("I don't understand the verb '" + actionKeyword + "'.");
-                    }
-                    break;
-            }
+            ambiguous = true;
+            LogText($"Which do you mean: {string.Join(", ", distinctNames)}?");
+            return default;
         }
+        return matches[0];
     }
 
     void EnterShopMode(Location shop)
     {
+        // Guard against a mis-authored OpenShop action in a non-shop room —
+        // entering Shop state with nothing to display looks like a freeze.
+        if (shop == null || !shop.isShop || !runtimeShopInventories.ContainsKey(shop))
+        {
+            Debug.LogWarning($"OpenShop was triggered in '{(shop != null ? shop.name : "null")}', which is not a shop. Set 'isShop' on the Location asset.");
+            LogText("There is no shop here.");
+            return;
+        }
         currentGameState = GameState.Shop;
         activeShop = shop;
         DisplayShopInventory();
@@ -491,7 +538,7 @@ public partial class GameController : MonoBehaviour
     {
         if (activeShop == null || !activeShop.isShop) return;
         // Get the live inventory from our runtime dictionary.
-        List<Item> currentShopStock = runtimeShopInventories[activeShop];
+        List<ItemInstance> currentShopStock = runtimeShopInventories[activeShop];
         StringBuilder shopText = new StringBuilder();
         shopText.AppendLine("<color=yellow>--- Items for Sale ---</color>");
         shopText.AppendLine("---------------------------------");
@@ -501,9 +548,11 @@ public partial class GameController : MonoBehaviour
         }
         else
         {
-            foreach (var item in currentShopStock)
+            List<string> shopLines = BuildGroupedItemLines(currentShopStock,
+                (item, count) => $"- {item.itemName}{(count > 1 ? " x" + count : "")} (Cost: {item.buyPrice} coins)");
+            foreach (var line in shopLines)
             {
-                shopText.AppendLine($"- {item.itemName} (Cost: {item.buyPrice} coins)");
+                shopText.AppendLine(line);
             }
         }
         shopText.AppendLine("---------------------------------");
@@ -522,6 +571,14 @@ public partial class GameController : MonoBehaviour
 
     void EnterSkillTrainingMode(Character trainer)
     {
+        // Guard against a mis-authored OpenSkillShop action on a character
+        // with nothing to teach.
+        if (trainer == null || trainer.skillsToTeach == null || trainer.skillsToTeach.Count == 0)
+        {
+            Debug.LogWarning($"OpenSkillShop was triggered on '{(trainer != null ? trainer.name : "null")}', but they have no skillsToTeach.");
+            LogText($"{(trainer != null ? trainer.characterName : "The trainer")} has nothing to teach you.");
+            return;
+        }
         currentGameState = GameState.SkillTraining;
         activeTrainer = trainer;
         DisplayTrainerSkills();
@@ -596,6 +653,11 @@ public partial class GameController : MonoBehaviour
         currentGameState = GameState.MiniGame;
         connectFourBoard = new int[C4_ROWS, C4_COLS];
         isPlayerTurn = true; // Player always starts first in Connect Four.
+        // The minigame is reached from dialogue, so the opponent is whoever
+        // the player was talking to.
+        minigameOpponentName = activeConversationCharacter != null
+            ? activeConversationCharacter.characterName
+            : "Your opponent";
         DisplayConnectFourBoard();
     }
     
@@ -608,7 +670,7 @@ public partial class GameController : MonoBehaviour
     IEnumerator AITurnCoroutine()
     {
         // 1. "Think"
-        LogText("Holden is thinking...", TextType.Narrative);
+        LogText($"{minigameOpponentName} is thinking...", TextType.Narrative);
         yield return new WaitForSeconds(1.0f); // Wait for 1 second
         // 2. Determine Move
         List<int> validColumns = new List<int>();
@@ -648,7 +710,7 @@ public partial class GameController : MonoBehaviour
         string endMessage;
         if (isTie) { endMessage = "The board is full. It's a draw!"; }
         else if (playerWon) { endMessage = "You win! Congratulations!"; }
-        else { endMessage = "Holden wins! Better luck next time."; }
+        else { endMessage = $"{minigameOpponentName} wins! Better luck next time."; }
         // Queue the two messages. They will now appear sequentially without glitches.
         LogText(endMessage, TextType.GameResponse);
         LogText("Press Enter to continue...", TextType.Narrative);
@@ -765,7 +827,8 @@ public partial class GameController : MonoBehaviour
             return;
         }
         // Find the target from the new runtime dictionary
-        var target = roomInteractablesState[currentLocation].Find(i => i.noun.ToLower() == nounPhrase.ToLower());
+        var target = FindByNoun(roomInteractablesState[currentLocation], i => i.noun, nounPhrase, out bool ambiguous);
+        if (ambiguous) return;
         if (target != null && target.allowedCustomActions.Contains(action))
         {
             // Success! Process all the effects defined on the CustomAction asset.
@@ -783,16 +846,15 @@ public partial class GameController : MonoBehaviour
                         interactableStates[target] = effect.stringParameter;
                         break;
                     case ActionEffectType.GiveItemToPlayer:
-                        if (effect.itemParameter != null)
-                        {
-                            playerInventory.Add(effect.itemParameter);
-                            LogText($"You receive the {effect.itemParameter.itemName}.", TextType.GameResponse);
-                        }
+                        TryGiveItem(effect.itemParameter);
                         break;
                     case ActionEffectType.TakeItemFromPlayer:
-                        if (effect.itemParameter != null && playerInventory.Contains(effect.itemParameter))
+                        var heldInstance = effect.itemParameter != null
+                            ? playerInventory.Find(inst => inst.blueprint == effect.itemParameter)
+                            : null;
+                        if (heldInstance != null)
                         {
-                            playerInventory.Remove(effect.itemParameter);
+                            playerInventory.Remove(heldInstance);
                             LogText($"You no longer have the {effect.itemParameter.itemName}.", TextType.GameResponse);
                         }
                         break;
@@ -841,40 +903,48 @@ public partial class GameController : MonoBehaviour
         {
             helpText.Append("\n- " + action.keyword);
         }
+        // Custom verbs are commands too.
+        foreach (CustomAction action in allCustomActions)
+        {
+            helpText.Append("\n- " + action.keyword);
+        }
         LogText(helpText.ToString(), TextType.Narrative);
     }
 
     void HandleEquip(string nounPhrase)
     {
-        var itemToEquip = playerInventory.Find(item => item.itemName.ToLower() == nounPhrase);
+        var itemToEquip = FindByNoun(playerInventory, inst => inst.blueprint.itemName, nounPhrase, out bool ambiguous);
+        if (ambiguous) return;
         if (itemToEquip == null)
         {
             LogText("You don't have a " + nounPhrase + ".");
             return;
         }
-        switch (itemToEquip.itemType)
+        switch (itemToEquip.blueprint.itemType)
         {
             case ItemType.Weapon:
                 // If a weapon is already equipped, unequip it first.
                 if (equippedWeapon != null)
                 {
                     playerInventory.Add(equippedWeapon);
-                    LogText($"You unequip the {equippedWeapon.itemName}.");
+                    LogText($"You unequip the {equippedWeapon.blueprint.itemName}.");
                 }
                 equippedWeapon = itemToEquip;
                 playerInventory.Remove(itemToEquip);
-                LogText("You equip the " + itemToEquip.itemName + ".");
+                LogText("You equip the " + itemToEquip.blueprint.itemName + ".");
+                RecalculatePlayerStats();
                 break;
             case ItemType.Armor:
                 // If armor is already equipped, unequip it first.
                 if (equippedArmor != null)
                 {
                     playerInventory.Add(equippedArmor);
-                    LogText($"You unequip the {equippedArmor.itemName}.");
+                    LogText($"You unequip the {equippedArmor.blueprint.itemName}.");
                 }
                 equippedArmor = itemToEquip;
                 playerInventory.Remove(itemToEquip);
-                LogText("You equip the " + itemToEquip.itemName + ".");
+                LogText("You equip the " + itemToEquip.blueprint.itemName + ".");
+                RecalculatePlayerStats();
                 break;
             default:
                 LogText("You can't equip a " + nounPhrase + ".");
@@ -884,29 +954,28 @@ public partial class GameController : MonoBehaviour
 
     void HandleUnequip(string nounPhrase)
     {
-        if (equippedWeapon != null && equippedWeapon.itemName.ToLower() == nounPhrase)
-        {
-            playerInventory.Add(equippedWeapon);
-            LogText("You unequip the " + equippedWeapon.itemName + ".");
-            equippedWeapon = null;
-        }
-        else if (equippedArmor != null && equippedArmor.itemName.ToLower() == nounPhrase)
-        {
-            playerInventory.Add(equippedArmor);
-            LogText("You unequip the " + equippedArmor.itemName + ".");
-            equippedArmor = null;
-        }
-        else
+        var equipped = new List<ItemInstance>();
+        if (equippedWeapon != null) equipped.Add(equippedWeapon);
+        if (equippedArmor != null) equipped.Add(equippedArmor);
+        var itemToUnequip = FindByNoun(equipped, inst => inst.blueprint.itemName, nounPhrase, out bool ambiguous);
+        if (ambiguous) return;
+        if (itemToUnequip == null)
         {
             LogText("You don't have a " + nounPhrase + " equipped.");
+            return;
         }
+        playerInventory.Add(itemToUnequip);
+        LogText("You unequip the " + itemToUnequip.blueprint.itemName + ".");
+        if (itemToUnequip == equippedWeapon) equippedWeapon = null;
+        else equippedArmor = null;
+        RecalculatePlayerStats();
     }
 
     void HandleEquipment()
     {
         StringBuilder equipmentText = new StringBuilder("You are wearing:");
-        equipmentText.Append("\nWeapon: " + (equippedWeapon != null ? equippedWeapon.itemName : "none"));
-        equipmentText.Append("\nArmor: " + (equippedArmor != null ? equippedArmor.itemName : "none"));
+        equipmentText.Append("\nWeapon: " + (equippedWeapon != null ? equippedWeapon.blueprint.itemName : "none"));
+        equipmentText.Append("\nArmor: " + (equippedArmor != null ? equippedArmor.blueprint.itemName : "none"));
         LogText(equipmentText.ToString(), TextType.Narrative);
     }
 
@@ -924,20 +993,28 @@ public partial class GameController : MonoBehaviour
         }
         // Use the runtime inventory for the transaction.
         var shopStock = runtimeShopInventories[currentLocation];
-        var item = shopStock.Find(i => i.itemName.ToLower() == nounPhrase.ToLower());
-        if (item == null)
+        var instance = FindByNoun(shopStock, inst => inst.blueprint.itemName, nounPhrase, out bool ambiguous);
+        if (ambiguous) return;
+        if (instance == null)
         {
             LogText($"The shop doesn’t sell a {nounPhrase}.", TextType.GameResponse);
             return;
         }
+        Item item = instance.blueprint;
         if (playerStats.currency < item.buyPrice)
         {
             LogText("You can’t afford that.", TextType.GameResponse);
             return;
         }
-        shopStock.Remove(item); // Modify the runtime copy, NOT the asset.
+        // Enforce the item's stack cap on player purchases.
+        if (item.isStackable && item.maxStackSize > 0 && CountInInventory(item) >= item.maxStackSize)
+        {
+            LogText($"You can't carry any more {item.itemName}.", TextType.GameResponse);
+            return;
+        }
+        shopStock.Remove(instance); // Modify the runtime copy, NOT the asset.
         playerStats.currency -= item.buyPrice;
-        playerInventory.Add(item);
+        playerInventory.Add(instance);
         LogText($"You spend {item.buyPrice} coins and buy a {item.itemName}. You now have {playerStats.currency} coins.", TextType.GameResponse);
     }
 
@@ -948,17 +1025,18 @@ public partial class GameController : MonoBehaviour
             LogText("There isn’t a shop here.", TextType.GameResponse);
             return;
         }
-        var item = playerInventory.Find(i => i.itemName.ToLower() == nounPhrase.ToLower());
-        if (item == null)
+        var instance = FindByNoun(playerInventory, inst => inst.blueprint.itemName, nounPhrase, out bool ambiguous);
+        if (ambiguous) return;
+        if (instance == null)
         {
             LogText($"You don’t have a {nounPhrase} to sell.", TextType.GameResponse);
             return;
         }
         // Add the sold item to the runtime inventory copy.
-        runtimeShopInventories[currentLocation].Add(item);
-        playerInventory.Remove(item);
-        playerStats.currency += item.sellPrice;
-        LogText($"You sell the {item.itemName} for {item.sellPrice} coins. You now have {playerStats.currency} coins.", TextType.GameResponse);
+        runtimeShopInventories[currentLocation].Add(instance);
+        playerInventory.Remove(instance);
+        playerStats.currency += instance.blueprint.sellPrice;
+        LogText($"You sell the {instance.blueprint.itemName} for {instance.blueprint.sellPrice} coins. You now have {playerStats.currency} coins.", TextType.GameResponse);
     }
 
     void HandleSave()
@@ -968,17 +1046,41 @@ public partial class GameController : MonoBehaviour
         // Save the entire PlayerStats object and the player's current health.
         saveData.playerStats = this.playerStats;
         saveData.playerCurrentHealth = this.playerCurrentHealth;
+        saveData.playerName = this.playerName;
+        saveData.playerDrunkenness = this.playerDrunkenness;
         saveData.currentLocationName = currentLocation != null ? currentLocation.name : "";
+        // --- 1b. Quests ---
+        saveData.activeQuests = activeQuests
+            .Where(aq => aq?.quest != null)
+            .Select(aq => new ActiveQuestSaveState
+            {
+                questName = aq.quest.name,
+                objectivesCompleted = new List<bool>(aq.objectivesCompleted)
+            })
+            .ToList();
+        saveData.completedQuestNames = completedQuests.Where(q => q != null).Select(q => q.name).ToList();
+        // --- 1c. Active Status Effects ---
+        saveData.activeStatusEffects = activeStatusEffects
+            .Where(ae => ae?.effect != null)
+            .Select(ae => new StatusEffectSaveState
+            {
+                effectName = ae.effect.name,
+                remainingTime = ae.RemainingTime
+            })
+            .ToList();
         // --- 2. Learned Skills ---
         // Convert the list of Skill ScriptableObjects to a list of their names for serialization.
         saveData.learnedSkillNames = learnedSkills.Select(s => s.name).ToList();
         // --- 3. Equipment ---
         // Save the names of the equipped weapon and armor.
-        saveData.equippedWeaponName = equippedWeapon != null ? equippedWeapon.name : null;
-        saveData.equippedArmorName = equippedArmor != null ? equippedArmor.name : null;
+        saveData.equippedWeaponName = equippedWeapon != null ? equippedWeapon.blueprint.name : null;
+        saveData.equippedArmorName = equippedArmor != null ? equippedArmor.blueprint.name : null;
         // --- 4. Inventory ---
         // Convert the player's inventory to a list of item names.
-        saveData.playerInventoryItemNames = playerInventory.Select(item => item.name).ToList();
+        saveData.playerInventoryItemNames = playerInventory
+            .Where(inst => inst?.blueprint != null)
+            .Select(inst => inst.blueprint.name)
+            .ToList();
         // --- 5. Room Items State ---
         // Loop through every location and save the items currently inside it.
         saveData.roomItemsState.Clear();
@@ -991,7 +1093,7 @@ public partial class GameController : MonoBehaviour
                 var room = new RoomInteractables
                 {
                     locationName = kvp.Key.name,
-                    interactableNouns = kvp.Value.Select(i => i.noun).ToList()
+                    interactableNames = kvp.Value.Where(i => i != null).Select(i => i.name).ToList()
                 };
                 saveData.roomInteractablesState.Add(room);
             }
@@ -1004,7 +1106,7 @@ public partial class GameController : MonoBehaviour
                 var room = new RoomItems
                 {
                     locationName = kvp.Key.name,
-                    itemNames = kvp.Value.Select(item => item.name).ToList()
+                    itemNames = kvp.Value.Where(inst => inst?.blueprint != null).Select(inst => inst.blueprint.name).ToList()
                 };
                 saveData.roomItemsState.Add(room);
             }
@@ -1044,16 +1146,20 @@ public partial class GameController : MonoBehaviour
             }
         }
         // --- 7. Interactable States ---
-        // Save the current state string for every interactable object in the game.
+        // Save the current state string for every interactable object in the
+        // game, identified by its home location + asset name.
         saveData.interactableStates.Clear();
         if (interactableStates != null)
         {
             foreach (var kvp in interactableStates)
             {
                 if (kvp.Key == null) continue;
+                var home = world.FindLocationOfInteractable(kvp.Key);
+                if (home == null) continue;
                 saveData.interactableStates.Add(new InteractableState
                 {
-                    interactableNoun = kvp.Key.noun,
+                    locationName = home.name,
+                    interactableName = kvp.Key.name,
                     state = kvp.Value ?? ""
                 });
             }
@@ -1102,7 +1208,7 @@ public partial class GameController : MonoBehaviour
             var shopState = new ShopSaveState
             {
                 locationName = kvp.Key.name,
-                shopItemNames = kvp.Value.Select(i => i.name).ToList()
+                shopItemNames = kvp.Value.Where(inst => inst?.blueprint != null).Select(inst => inst.blueprint.name).ToList()
             };
             saveData.shopStates.Add(shopState);
         }
@@ -1130,7 +1236,47 @@ public partial class GameController : MonoBehaviour
         // --- 1. Load Player & World State ---
         this.playerStats = saveData.playerStats;
         this.playerCurrentHealth = saveData.playerCurrentHealth;
+        this.playerName = saveData.playerName;
+        this.playerDrunkenness = saveData.playerDrunkenness;
         currentLocation = FindLocationByName(saveData.currentLocationName);
+        // A renamed or deleted location asset must not strand the player in
+        // a null room — fall back to the main start location.
+        if (currentLocation == null)
+        {
+            Debug.LogWarning($"Saved location '{saveData.currentLocationName}' was not found. Falling back to the main start location.");
+            currentLocation = mainGameStartLocation;
+        }
+        // --- 1b. Load Quests ---
+        activeQuests.Clear();
+        completedQuests.Clear();
+        foreach (var questSave in saveData.activeQuests)
+        {
+            Quest quest = world.FindQuestByName(questSave.questName);
+            if (quest == null) continue;
+            var activeQuest = new ActiveQuest(quest);
+            // Copy saved objective progress; guard against objective-count
+            // changes between the save and the current quest asset.
+            for (int i = 0; i < activeQuest.objectivesCompleted.Count && i < questSave.objectivesCompleted.Count; i++)
+            {
+                activeQuest.objectivesCompleted[i] = questSave.objectivesCompleted[i];
+            }
+            activeQuests.Add(activeQuest);
+        }
+        foreach (var questName in saveData.completedQuestNames)
+        {
+            Quest quest = world.FindQuestByName(questName);
+            if (quest != null) completedQuests.Add(quest);
+        }
+        // --- 1c. Load Active Status Effects ---
+        activeStatusEffects.Clear();
+        foreach (var effectSave in saveData.activeStatusEffects)
+        {
+            StatusEffect effect = world.FindStatusEffectByName(effectSave.effectName);
+            if (effect != null && effectSave.remainingTime > 0f)
+            {
+                activeStatusEffects.Add(new ActiveStatusEffect(effect, effectSave.remainingTime));
+            }
+        }
         // --- 2. Load Learned Skills ---
         learnedSkills.Clear();
         foreach (var skillName in saveData.learnedSkillNames)
@@ -1142,11 +1288,14 @@ public partial class GameController : MonoBehaviour
             }
         }
         // --- 3. Load Equipment & Inventory ---
-        equippedWeapon = FindItemByName(saveData.equippedWeaponName);
-        equippedArmor = FindItemByName(saveData.equippedArmorName);
+        Item weaponBlueprint = FindItemByName(saveData.equippedWeaponName);
+        Item armorBlueprint = FindItemByName(saveData.equippedArmorName);
+        equippedWeapon = weaponBlueprint != null ? new ItemInstance(weaponBlueprint) : null;
+        equippedArmor = armorBlueprint != null ? new ItemInstance(armorBlueprint) : null;
         playerInventory = saveData.playerInventoryItemNames
             .Select(name => FindItemByName(name))
             .Where(item => item != null)
+            .Select(item => new ItemInstance(item))
             .ToList();
         RecalculatePlayerStats();
         // --- 4. Load Room Items State ---
@@ -1155,9 +1304,10 @@ public partial class GameController : MonoBehaviour
             Location location = FindLocationByName(roomData.locationName);
             if (location != null)
             {
-                List<Item> itemsInRoom = roomData.itemNames
+                List<ItemInstance> itemsInRoom = roomData.itemNames
                     .Select(name => FindItemByName(name))
                     .Where(item => item != null)
+                    .Select(item => new ItemInstance(item))
                     .ToList();
                 roomItemsState[location] = itemsInRoom;
             }
@@ -1190,7 +1340,8 @@ public partial class GameController : MonoBehaviour
         // --- 6. Load Interactable States ---
         foreach (InteractableState interactableData in saveData.interactableStates)
         {
-            Interactable interactable = FindInteractableByNoun(interactableData.interactableNoun);
+            Location home = FindLocationByName(interactableData.locationName);
+            Interactable interactable = world.FindInteractableInLocation(home, interactableData.interactableName);
             if (interactable != null)
             {
                 interactableStates[interactable] = interactableData.state;
@@ -1231,9 +1382,10 @@ public partial class GameController : MonoBehaviour
             var loc = FindLocationByName(shopState.locationName);
             if (loc != null && loc.isShop)
             {
-                List<Item> runtimeItems = shopState.shopItemNames
+                List<ItemInstance> runtimeItems = shopState.shopItemNames
                     .Select(name => FindItemByName(name))
                     .Where(item => item != null)
+                    .Select(item => new ItemInstance(item))
                     .ToList();
                 // Overwrite the runtime inventory with the saved data.
                 runtimeShopInventories[loc] = runtimeItems;
@@ -1250,8 +1402,8 @@ public partial class GameController : MonoBehaviour
             Location location = FindLocationByName(roomData.locationName);
             if (location != null)
             {
-                List<Interactable> runtimeInteractables = roomData.interactableNouns
-                    .Select(noun => FindInteractableByNoun(noun))
+                List<Interactable> runtimeInteractables = roomData.interactableNames
+                    .Select(name => world.FindInteractableInLocation(location, name))
                     .Where(i => i != null)
                     .ToList();
 
@@ -1271,15 +1423,18 @@ public partial class GameController : MonoBehaviour
             DisplayLocation(useTypewriter: false);
             return;
         }
+        bool ambiguous;
         // Check room items
-        var itemInRoom = roomItemsState[currentLocation].Find(item => item.itemName.ToLower() == nounPhrase);
+        var itemInRoom = FindByNoun(roomItemsState[currentLocation], inst => inst.blueprint.itemName, nounPhrase, out ambiguous);
+        if (ambiguous) return;
         if (itemInRoom != null)
         {
-            LogText(itemInRoom.description);
+            LogText(itemInRoom.blueprint.description);
             return;
         }
         // Check interactables
-        var interactableInRoom = roomInteractablesState[currentLocation].Find(i => i.noun.ToLower() == nounPhrase);
+        var interactableInRoom = FindByNoun(roomInteractablesState[currentLocation], i => i.noun, nounPhrase, out ambiguous);
+        if (ambiguous) return;
         if (interactableInRoom != null)
         {
             LogText(interactableInRoom.detailedDescription);
@@ -1287,14 +1442,16 @@ public partial class GameController : MonoBehaviour
         }
 
         // Check characters
-        var characterInRoom = roomCharactersState[currentLocation].Find(c => c.characterName.ToLower() == nounPhrase);
+        var characterInRoom = FindByNoun(roomCharactersState[currentLocation], c => c.characterName, nounPhrase, out ambiguous);
+        if (ambiguous) return;
         if (characterInRoom != null)
         {
             LogText(characterInRoom.detailedDescription);
             return;
         }
         // Check enemies
-        var enemyInRoom = roomEnemiesState[currentLocation].Find(e => e.enemyBlueprint.enemyName.ToLower() == nounPhrase);
+        var enemyInRoom = FindByNoun(roomEnemiesState[currentLocation], e => e.enemyBlueprint.enemyName, nounPhrase, out ambiguous);
+        if (ambiguous) return;
         if (enemyInRoom != null)
         {
             string descriptionWithHealth = enemyInRoom.enemyBlueprint.detailedDescription +
@@ -1303,10 +1460,11 @@ public partial class GameController : MonoBehaviour
             return;
         }
         // Check inventory
-        var itemInInventory = playerInventory.Find(item => item.itemName.ToLower() == nounPhrase);
+        var itemInInventory = FindByNoun(playerInventory, inst => inst.blueprint.itemName, nounPhrase, out ambiguous);
+        if (ambiguous) return;
         if (itemInInventory != null)
         {
-            LogText(itemInInventory.description);
+            LogText(itemInInventory.blueprint.description);
             return;
         }
         LogText("There is no " + nounPhrase + " to look at.");
@@ -1314,9 +1472,11 @@ public partial class GameController : MonoBehaviour
 
     void HandleTake(string nounPhrase)
     {
-        var itemToTake = roomItemsState[currentLocation].Find(item => item.itemName.ToLower() == nounPhrase);
-        if (itemToTake != null)
+        var instanceToTake = FindByNoun(roomItemsState[currentLocation], inst => inst.blueprint.itemName, nounPhrase, out bool ambiguous);
+        if (ambiguous) return;
+        if (instanceToTake != null)
         {
+            Item itemToTake = instanceToTake.blueprint;
             if (itemToTake.itemType == ItemType.Currency)
             {
                 // The value of the currency item is its sell price.
@@ -1324,7 +1484,7 @@ public partial class GameController : MonoBehaviour
                 // Add the item's value to the player's total currency.
                 playerStats.currency += value;
                 // Remove the currency item from the room.
-                roomItemsState[currentLocation].Remove(itemToTake);
+                roomItemsState[currentLocation].Remove(instanceToTake);
                 // Fire the onItemTaken event so the sound can play.
                 onItemTaken.Invoke(itemToTake);
                 // Log a specific message to the player.
@@ -1334,11 +1494,17 @@ public partial class GameController : MonoBehaviour
                 // Stop the method here so we don't add it to the inventory.
                 return;
             }
-            roomItemsState[currentLocation].Remove(itemToTake);
-            playerInventory.Add(itemToTake);
+            // Enforce the item's stack cap when the player picks it up.
+            if (itemToTake.isStackable && itemToTake.maxStackSize > 0 && CountInInventory(itemToTake) >= itemToTake.maxStackSize)
+            {
+                LogText($"You can't carry any more {itemToTake.itemName}.");
+                return;
+            }
+            roomItemsState[currentLocation].Remove(instanceToTake);
+            playerInventory.Add(instanceToTake);
             DisplayLocation(useTypewriter: false);
             onItemTaken.Invoke(itemToTake);
-            LogText("You take the " + nounPhrase + ".");
+            LogText("You take the " + itemToTake.itemName + ".");
         }
         else
         {
@@ -1349,38 +1515,39 @@ public partial class GameController : MonoBehaviour
     void HandleUse(string itemNounPhrase, string targetNounPhrase)
     {
         // Find the item the player is trying to use from their inventory.
-        var itemInInventory = playerInventory.Find(item =>
-            item != null && item.itemName.ToLower() == itemNounPhrase.ToLower());
+        var itemInInventory = FindByNoun(playerInventory, inst => inst.blueprint.itemName, itemNounPhrase, out bool itemAmbiguous);
+        if (itemAmbiguous) return;
         if (itemInInventory == null)
         {
             LogText("You don't have a " + itemNounPhrase + ".");
             return;
         }
+        Item usedItem = itemInInventory.blueprint;
         // --- Case 1: Using a CONSUMABLE item without a target (e.g., "use potion") ---
-        if (string.IsNullOrEmpty(targetNounPhrase) && itemInInventory.itemType == ItemType.Consumable)
+        if (string.IsNullOrEmpty(targetNounPhrase) && usedItem.itemType == ItemType.Consumable)
         {
             bool itemWasConsumed = false;
             // Health restoration
-            if (itemInInventory.healthToRestore > 0)
+            if (usedItem.healthToRestore > 0)
             {
-                playerCurrentHealth = Mathf.Min(playerStats.maxHealth, playerCurrentHealth + itemInInventory.healthToRestore);
-                LogText($"You use the {itemNounPhrase} and restore {itemInInventory.healthToRestore} health. You now have {playerCurrentHealth}/{playerStats.maxHealth} health.");
+                playerCurrentHealth = Mathf.Min(playerStats.maxHealth, playerCurrentHealth + usedItem.healthToRestore);
+                LogText($"You use the {usedItem.itemName} and restore {usedItem.healthToRestore} health. You now have {playerCurrentHealth}/{playerStats.maxHealth} health.");
                 itemWasConsumed = true;
             }
             // Drunkenness effect
-            if (engineSettings.useDrunkennessSystem && itemInInventory.drunkennessValue > 0)
+            if (engineSettings.useDrunkennessSystem && usedItem.drunkennessValue > 0)
             {
-                playerDrunkenness += itemInInventory.drunkennessValue;
+                playerDrunkenness += usedItem.drunkennessValue;
                 playerDrunkenness = Mathf.Clamp(playerDrunkenness, 0f, 1f);
                 LogText("You feel a bit dizzy...");
                 itemWasConsumed = true;
             }
             // Status effect application
-            if (engineSettings.useStatusEffectSystem && itemInInventory.effectToApplyOnUse != null)
+            if (engineSettings.useStatusEffectSystem && usedItem.effectToApplyOnUse != null)
             {
-                if (Random.value <= itemInInventory.effectToApplyOnUse.chanceToApply)
+                if (Random.value <= usedItem.effectToApplyOnUse.chanceToApply)
                 {
-                    ActiveStatusEffect newEffect = new ActiveStatusEffect(itemInInventory.effectToApplyOnUse);
+                    ActiveStatusEffect newEffect = new ActiveStatusEffect(usedItem.effectToApplyOnUse);
                     activeStatusEffects.Add(newEffect);
                     LogText(newEffect.effect.applicationMessage);
                 }
@@ -1395,7 +1562,8 @@ public partial class GameController : MonoBehaviour
         // --- Case 2: Using an item ON an INTERACTABLE target (e.g., "use handle on toilet") ---
         if (!string.IsNullOrEmpty(targetNounPhrase))
         {
-            var target = roomInteractablesState[currentLocation].Find(i => i.noun.ToLower() == targetNounPhrase.ToLower());
+            var target = FindByNoun(roomInteractablesState[currentLocation], i => i.noun, targetNounPhrase, out bool targetAmbiguous);
+            if (targetAmbiguous) return;
             if (target == null)
             {
                 LogText("There is no " + targetNounPhrase + " here to use that on.");
@@ -1404,7 +1572,7 @@ public partial class GameController : MonoBehaviour
             string currentState = interactableStates[target];
             foreach (Interaction interaction in target.interactions)
             {
-                if (interaction.requiredState == currentState && interaction.requiredItem == itemInInventory)
+                if (interaction.requiredState == currentState && interaction.requiredItem == usedItem)
                 {
                     ProcessInteractionEffects(interaction, target, itemInInventory);
                     return;
@@ -1419,10 +1587,10 @@ public partial class GameController : MonoBehaviour
             foreach (Exit exit in currentLocation.exits)
             {
                 // Check if this exit is locked AND if the item used is the correct key.
-                if (exitLockedState.ContainsKey(exit) && exitLockedState[exit] && exit.keyToUnlock == itemInInventory)
+                if (exitLockedState.ContainsKey(exit) && exitLockedState[exit] && exit.keyToUnlock == usedItem)
                 {
                     exitLockedState[exit] = false; // Unlock the exit
-                    LogText($"You use the {itemInInventory.itemName}. You hear a click as the {exit.direction} door unlocks.", TextType.GameResponse);
+                    LogText($"You use the {usedItem.itemName}. You hear a click as the {exit.direction} door unlocks.", TextType.GameResponse);
                     return; // Stop the function here.
                 }
             }
@@ -1433,7 +1601,8 @@ public partial class GameController : MonoBehaviour
 
     private void HandleInteract(string verb, string nounPhrase)
     {
-        var target = roomInteractablesState[currentLocation].Find(i => i.noun.ToLower() == nounPhrase.ToLower());
+        var target = FindByNoun(roomInteractablesState[currentLocation], i => i.noun, nounPhrase, out bool ambiguous);
+        if (ambiguous) return;
         if (target == null)
         {
             LogText("There is no " + nounPhrase + " here to interact with.");
@@ -1456,7 +1625,7 @@ public partial class GameController : MonoBehaviour
         LogText("That doesn't seem to work.");
     }
 
-    private void ProcessInteractionEffects(Interaction interaction, Interactable sourceInteractable, Item itemUsed = null)
+    private void ProcessInteractionEffects(Interaction interaction, Interactable sourceInteractable, ItemInstance itemUsed = null)
     {
         foreach (var effect in interaction.effects)
         {
@@ -1482,7 +1651,7 @@ public partial class GameController : MonoBehaviour
                 case InteractionEffectType.SpawnItemInRoom:
                     if (effect.itemParameter != null)
                     {
-                        roomItemsState[currentLocation].Add(effect.itemParameter);
+                        roomItemsState[currentLocation].Add(new ItemInstance(effect.itemParameter));
                         LogText($"A {effect.itemParameter.itemName} is revealed!", TextType.GameResponse);
                     }
                     break;
@@ -1494,7 +1663,7 @@ public partial class GameController : MonoBehaviour
                     if (itemUsed != null && playerInventory.Contains(itemUsed))
                     {
                         playerInventory.Remove(itemUsed);
-                        LogText($"(You used the {itemUsed.itemName})", TextType.GameResponse);
+                        LogText($"(You used the {itemUsed.blueprint.itemName})", TextType.GameResponse);
                     }
                     break;
             }
@@ -1636,19 +1805,83 @@ public partial class GameController : MonoBehaviour
 
     void HandleDrop(string nounPhrase)
     {
-        var itemToDrop = playerInventory.Find(item => item.itemName.ToLower() == nounPhrase);
+        var itemToDrop = FindByNoun(playerInventory, inst => inst.blueprint.itemName, nounPhrase, out bool ambiguous);
+        if (ambiguous) return;
         if (itemToDrop != null)
         {
             playerInventory.Remove(itemToDrop);
             roomItemsState[currentLocation].Add(itemToDrop);
             DisplayLocation(useTypewriter: false);
-            onItemTaken.Invoke(itemToDrop);
-            LogText("You drop the " + nounPhrase + ".");
+            onItemDropped.Invoke(itemToDrop.blueprint);
+            LogText("You drop the " + itemToDrop.blueprint.itemName + ".");
         }
         else
         {
             LogText("You don't have a " + nounPhrase + ".");
         }
+    }
+
+    // Returns how many copies of the item blueprint the player is holding.
+    private int CountInInventory(Item item) => playerInventory.Count(inst => inst.blueprint == item);
+
+    // Adds an item to the player's inventory unless its stack cap is already
+    // reached, and announces the result. Every grant path (dialogue gifts,
+    // custom actions, quest rewards) goes through here so the cap that 'take'
+    // and 'buy' enforce can't be bypassed. Returns whether the item was given.
+    private bool TryGiveItem(Item item)
+    {
+        if (item == null) return false;
+        if (item.isStackable && item.maxStackSize > 0 && CountInInventory(item) >= item.maxStackSize)
+        {
+            LogText($"You can't carry any more {item.itemName}.", TextType.GameResponse);
+            return false;
+        }
+        playerInventory.Add(new ItemInstance(item));
+        LogText($"You receive the <color={keywordColor}>{item.itemName}</color>.", TextType.GameResponse);
+        return true;
+    }
+
+    // Groups identical stackable items and appends " xN" when count > 1.
+    // Non-stackable items (isStackable == false) are listed individually.
+    // Each line is produced by the given formatter, which receives the item
+    // blueprint and the count represented by that line. First-seen ordering is
+    // preserved by tracking keys in a list alongside the count dictionary.
+    private List<string> BuildGroupedItemLines(IEnumerable<ItemInstance> items, System.Func<Item, int, string> lineFormatter)
+    {
+        // 'order' records one entry per output line, in first-seen order.
+        // Stackable items appear once here (their count accumulates in 'counts');
+        // non-stackable items get a fresh entry each time so they list individually.
+        var order = new List<Item>();
+        var counts = new Dictionary<Item, int>();
+        foreach (var instance in items)
+        {
+            var item = instance?.blueprint;
+            if (item == null) continue;
+            if (item.isStackable)
+            {
+                if (counts.ContainsKey(item))
+                {
+                    counts[item]++;
+                }
+                else
+                {
+                    counts[item] = 1;
+                    order.Add(item);
+                }
+            }
+            else
+            {
+                // Non-stackable items are always listed individually.
+                order.Add(item);
+            }
+        }
+        var lines = new List<string>();
+        foreach (var item in order)
+        {
+            int count = item.isStackable ? counts[item] : 1;
+            lines.Add(lineFormatter(item, count));
+        }
+        return lines;
     }
 
     void HandleInventory()
@@ -1659,24 +1892,21 @@ public partial class GameController : MonoBehaviour
             LogText("You are not carrying anything.");
             return;
         }
-        StringBuilder inventoryText = new StringBuilder("You are carrying:");
-        bool hasItems = false; // A flag to check if we actually have any valid items
-        foreach (Item item in playerInventory)
-        {
-            if (item != null)
-            {
-                inventoryText.Append("\n- " + item.itemName);
-                hasItems = true;
-            }
-        }
+        List<string> lines = BuildGroupedItemLines(playerInventory,
+            (item, count) => "- " + item.itemName + (count > 1 ? " x" + count : ""));
 
         // If our inventory only contained null items, we should still say we have nothing.
-        if (!hasItems)
+        if (lines.Count == 0)
         {
             LogText("You are not carrying anything.");
         }
         else
         {
+            StringBuilder inventoryText = new StringBuilder("You are carrying:");
+            foreach (string line in lines)
+            {
+                inventoryText.Append("\n" + line);
+            }
             LogText(inventoryText.ToString(), TextType.Narrative);
         }
     }
@@ -1716,14 +1946,19 @@ public partial class GameController : MonoBehaviour
 
     private void RecalculatePlayerStats()
     {
+        // Flat attack from equipment applies in both stat modes. (defenseBonus
+        // is intentionally NOT baked in here — armor mitigation is applied at
+        // combat time in PerformStandardAttack.)
+        int equipmentAttack = (equippedWeapon != null ? equippedWeapon.blueprint.attackBonus : 0)
+                            + (equippedArmor != null ? equippedArmor.blueprint.attackBonus : 0);
         // If we are NOT using the primary attribute system, calculate simple stats and exit.
         if (!engineSettings.usePrimaryAttributes)
         {
             // Simple, direct stats for a less complex game.
-            playerStats.maxHealth = 100;
-            playerStats.baseAttack = 10;
-            playerStats.hitChance = 0.85f; // 85% base
-            playerStats.dodgeChance = 0.10f; // 10% base
+            playerStats.maxHealth = engineSettings.simpleMaxHealth;
+            playerStats.baseAttack = engineSettings.simpleBaseAttack + equipmentAttack;
+            playerStats.hitChance = engineSettings.simpleHitChance;
+            playerStats.dodgeChance = engineSettings.simpleDodgeChance;
             // Ensure current health doesn't exceed new max health
             playerCurrentHealth = Mathf.Min(playerCurrentHealth, playerStats.maxHealth);
             return; // Stop the function here.
@@ -1734,18 +1969,13 @@ public partial class GameController : MonoBehaviour
         int agility_bonus = 0;
         int stamina_bonus = 0;
         int intellect_bonus = 0;
-        int attack_bonus_from_effects = 0;
-        int defense_bonus_from_effects = 0;
-        // 2. Add bonuses from equipped items.
-        if (equippedWeapon != null)
+        // 2. Add attribute bonuses from equipped items.
+        foreach (var equipped in new[] { equippedWeapon, equippedArmor })
         {
-            // You would add bonuses from items here, e.g.:
-            // strength_bonus += equippedWeapon.strengthBonus; 
-        }
-        if (equippedArmor != null)
-        {
-            // stamina_bonus += equippedArmor.staminaBonus;
-            // agility_bonus += equippedArmor.agilityBonus;
+            if (equipped == null) continue;
+            strength_bonus += equipped.blueprint.strengthBonus;
+            agility_bonus += equipped.blueprint.agilityBonus;
+            stamina_bonus += equipped.blueprint.staminaBonus;
         }
         // 3. Loop through learned skills and add their bonuses.
         foreach (Skill skill in learnedSkills)
@@ -1770,27 +2000,6 @@ public partial class GameController : MonoBehaviour
                 }
             }
         }
-        if (engineSettings.useStatusEffectSystem)
-        {
-            foreach (ActiveStatusEffect statusEffect in activeStatusEffects)
-            {
-                switch (statusEffect.effect.effectType)
-                {
-                    case EffectType.IncreaseAttack:
-                        attack_bonus_from_effects += statusEffect.effect.magnitude;
-                        break;
-                    case EffectType.DecreaseAttack:
-                        attack_bonus_from_effects -= statusEffect.effect.magnitude;
-                        break;
-                    case EffectType.IncreaseDefense:
-                        defense_bonus_from_effects += statusEffect.effect.magnitude;
-                        break;
-                    case EffectType.DecreaseDefense:
-                        defense_bonus_from_effects -= statusEffect.effect.magnitude;
-                        break;
-                }
-            }
-        }
         // 4. Calculate the final primary attributes.
         // NOTE: these are LOCAL only. We must never write them back into
         // playerStats.strength/etc., or the bonuses would be baked into the
@@ -1800,11 +2009,17 @@ public partial class GameController : MonoBehaviour
         int finalAgility = playerStats.agility + agility_bonus;
         int finalIntellect = playerStats.intellect + intellect_bonus;
         // 5. Calculate all secondary stats based on the final primary attributes.
-        playerStats.maxMana = 20 + (finalIntellect * 10);
-        playerStats.maxHealth = 50 + (finalStamina * 10);
-        playerStats.baseAttack = 5 + (finalStrength * 2);
-        playerStats.dodgeChance = Mathf.Clamp(0.05f + (finalAgility * 0.01f), 0f, 0.75f);
-        playerStats.hitChance = Mathf.Clamp(0.80f + (finalAgility * 0.02f), 0f, 0.95f);
+        //    Note: temporary IncreaseAttack/DecreaseAttack and defense status
+        //    effects are NOT baked in here. They are applied fresh at combat
+        //    time (see GetAttackBonusFromEffects / PerformStandardAttack) because
+        //    effects are added and expire without triggering a recalculation.
+        playerStats.maxMana = engineSettings.baseMana + (finalIntellect * engineSettings.manaPerIntellect);
+        playerStats.maxHealth = engineSettings.baseHealth + (finalStamina * engineSettings.healthPerStamina);
+        playerStats.baseAttack = engineSettings.baseAttackValue + (finalStrength * engineSettings.attackPerStrength) + equipmentAttack;
+        playerStats.dodgeChance = Mathf.Clamp(
+            engineSettings.baseDodgeChance + (finalAgility * engineSettings.dodgePerAgility), 0f, engineSettings.maxDodgeChance);
+        playerStats.hitChance = Mathf.Clamp(
+            engineSettings.baseHitChance + (finalAgility * engineSettings.hitPerAgility), 0f, engineSettings.maxHitChance);
         // 6. Clamp current health and mana so they don't exceed the new maximums.
         playerCurrentHealth = Mathf.Min(playerCurrentHealth, playerStats.maxHealth);
         playerStats.currentMana = Mathf.Min(playerStats.currentMana, playerStats.maxMana);
@@ -1814,7 +2029,7 @@ public partial class GameController : MonoBehaviour
     {
         if (!isPlayerTurn)
         {
-            LogText("Wait for Holden to make his move!", TextType.GameResponse);
+            LogText($"Wait for {minigameOpponentName} to make a move!", TextType.GameResponse);
             return;
         }
         string formattedInput = inputText.ToLower();
@@ -1874,12 +2089,15 @@ public partial class GameController : MonoBehaviour
 
     void AttemptToMove(string direction)
     {
+        // Expand single-letter shortcuts ("go n" -> "go north").
+        if (directionAliases.TryGetValue(direction, out string fullDirection)) direction = fullDirection;
         foreach (Exit exit in currentLocation.exits)
         {
             if (exit.direction.ToLower() == direction)
             {
                 if (exitVisibilityState[exit] == false) { continue; }
-                if (exit.exitAction == ExitActionType.BlockIfHoldingItem && playerInventory.Contains(exit.blockingItem)) { LogText(exit.blockedMessage); return; }
+                if (exit.exitAction == ExitActionType.BlockIfHoldingItem && exit.blockingItem != null &&
+                    playerInventory.Any(inst => inst.blueprint == exit.blockingItem)) { LogText(exit.blockedMessage); return; }
                 if (exitLockedState[exit] == true) { LogText(exit.lockedDescription); return; }
                 Location destination = exit.destination;
                 string actionMessage = ProcessExitAction(exit);
@@ -1900,8 +2118,9 @@ public partial class GameController : MonoBehaviour
                 else
                 {
                     DisplayLocation();
-                    CheckForAmbushes();
                 }
+                // Ambushers strike no matter which kind of exit you arrived by.
+                CheckForAmbushes();
                 return;
             }
         }
@@ -1936,9 +2155,9 @@ public partial class GameController : MonoBehaviour
                     {
                         // Add each item to the runtime list for the target location.
                         // We still check to make sure we don't add duplicates.
-                        if (!roomItemsState[exit.targetLocation].Contains(item))
+                        if (!roomItemsState[exit.targetLocation].Any(inst => inst.blueprint == item))
                         {
-                            roomItemsState[exit.targetLocation].Add(item);
+                            roomItemsState[exit.targetLocation].Add(new ItemInstance(item));
                         }
                     }
                 }
@@ -1963,7 +2182,7 @@ public partial class GameController : MonoBehaviour
         // 2) Reset inventory
         playerInventory.Clear();
         foreach (var item in scenario.startingInventory)
-            playerInventory.Add(item);
+            if (item != null) playerInventory.Add(new ItemInstance(item));
         // 3) Reset enemies
         if (!roomEnemiesState.ContainsKey(currentLocation))
             roomEnemiesState[currentLocation] = new List<EnemyInstance>();
@@ -2000,8 +2219,9 @@ public partial class GameController : MonoBehaviour
         // Highlight items
         if (roomItemsState.TryGetValue(currentLocation, out var itemsInRoom) && itemsInRoom != null)
         {
-            foreach (var item in itemsInRoom)
+            foreach (var instance in itemsInRoom)
             {
+                var item = instance?.blueprint;
                 if (item == null) continue;
                 string pattern = $@"\b{Regex.Escape(item.itemName)}\b";
                 text = Regex.Replace(text, pattern,
@@ -2050,7 +2270,6 @@ public partial class GameController : MonoBehaviour
     // World lookups live in WorldState; these forward for readability at call sites.
     private Location FindLocationByName(string name) => world.FindLocationByName(name);
     private Item FindItemByName(string name) => world.FindItemByName(name);
-    private Interactable FindInteractableByNoun(string noun) => world.FindInteractableByNoun(noun);
     private Exit FindExit(Location loc, string direction) => world.FindExit(loc, direction);
     private Location FindLocationOfExit(Exit exitToFind) => world.FindLocationOfExit(exitToFind);
 
@@ -2064,11 +2283,19 @@ public partial class GameController : MonoBehaviour
         // Base description
         sb.Append(currentLocation?.description ?? "");
         // Items in room (guard against missing key or null list)
-        List<Item> items = roomItemsState.ContainsKey(currentLocation)
-            ? roomItemsState[currentLocation] ?? new List<Item>()
-            : new List<Item>();
-        foreach (var item in items)
-            sb.Append(" " + (item?.descriptionInRoom ?? ""));
+        List<ItemInstance> items = roomItemsState.ContainsKey(currentLocation)
+            ? roomItemsState[currentLocation] ?? new List<ItemInstance>()
+            : new List<ItemInstance>();
+        // De-duplicate identical stackable items so a repeated blueprint doesn't
+        // print its descriptionInRoom sentence multiple times.
+        var describedItems = new HashSet<Item>();
+        foreach (var instance in items)
+        {
+            var item = instance?.blueprint;
+            if (item == null) continue;
+            if (item.isStackable && !describedItems.Add(item)) continue;
+            sb.Append(" " + (item.descriptionInRoom ?? ""));
+        }
         // Interactables
         List<Interactable> interactables = roomInteractablesState.ContainsKey(currentLocation)
             ? roomInteractablesState[currentLocation] ?? new List<Interactable>()
@@ -2118,13 +2345,11 @@ public partial class GameController : MonoBehaviour
     private void GrantXp(int amount)
     {
         if (amount <= 0) return;
+        // With leveling disabled, XP is meaningless — don't award or announce it.
+        if (!engineSettings.useLevelingSystem) return;
 
         playerStats.currentXp += amount;
         LogText($"You gain {amount} XP.", TextType.GameResponse);
-        if (!engineSettings.useLevelingSystem)
-        {
-            return;
-        }
 
         // Check if the player has enough XP to level up.
         // A while loop handles the case of gaining multiple levels at once.
@@ -2132,11 +2357,11 @@ public partial class GameController : MonoBehaviour
         {
             playerStats.currentXp -= playerStats.xpToNextLevel;
             playerStats.level++;
-            playerStats.skillPoints++;
+            playerStats.skillPoints += engineSettings.skillPointsPerLevel;
             // Give a base attribute point on level up for the player to spend later, or automatically grant stats
-            playerStats.stamina++;
-            playerStats.strength++;
-            playerStats.xpToNextLevel = Mathf.RoundToInt(playerStats.xpToNextLevel * 1.5f);
+            playerStats.stamina += engineSettings.staminaPerLevel;
+            playerStats.strength += engineSettings.strengthPerLevel;
+            playerStats.xpToNextLevel = Mathf.RoundToInt(playerStats.xpToNextLevel * engineSettings.xpCurveMultiplier);
             RecalculatePlayerStats(); // Recalculate all stats with the new base values
             playerCurrentHealth = playerStats.maxHealth; // Full heal
             LogText($"<color=yellow>LEVEL UP! You are now level {playerStats.level}!</color>", TextType.Narrative);

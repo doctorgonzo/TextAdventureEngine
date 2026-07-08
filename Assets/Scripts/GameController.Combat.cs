@@ -6,6 +6,38 @@ using UnityEngine;
 // This is a partial of the same class defined in GameController.cs.
 public partial class GameController
 {
+    // Sums the temporary attack modifier from all active status effects.
+    // Applied fresh at attack time so buffs/debuffs take effect (and expire)
+    // without needing a full stat recalculation.
+    private int GetAttackBonusFromEffects()
+    {
+        if (!engineSettings.useStatusEffectSystem) return 0;
+        int bonus = 0;
+        foreach (ActiveStatusEffect statusEffect in activeStatusEffects)
+        {
+            if (statusEffect.effect.effectType == EffectType.IncreaseAttack)
+                bonus += statusEffect.effect.magnitude;
+            else if (statusEffect.effect.effectType == EffectType.DecreaseAttack)
+                bonus -= statusEffect.effect.magnitude;
+        }
+        return bonus;
+    }
+
+    // Sums the temporary defense modifier from all active status effects.
+    private int GetDefenseBonusFromEffects()
+    {
+        if (!engineSettings.useStatusEffectSystem) return 0;
+        int bonus = 0;
+        foreach (ActiveStatusEffect statusEffect in activeStatusEffects)
+        {
+            if (statusEffect.effect.effectType == EffectType.IncreaseDefense)
+                bonus += statusEffect.effect.magnitude;
+            else if (statusEffect.effect.effectType == EffectType.DecreaseDefense)
+                bonus -= statusEffect.effect.magnitude;
+        }
+        return bonus;
+    }
+
     public void ApplyTimedEffect(StatusEffect effect)
     {
         if (!engineSettings.useStatusEffectSystem) return;
@@ -32,6 +64,7 @@ public partial class GameController
 
     void HandleAttack(string nounPhrase)
     {
+        bool ambiguous;
         // --- 1. Check for Player Stun ---
         if (isPlayerStunned)
         {
@@ -39,7 +72,7 @@ public partial class GameController
             isPlayerStunned = false; // The stun wears off after one missed turn.
 
             // The enemy still gets to take its turn even if the player is stunned.
-            var stunnedEnemyTarget = roomEnemiesState[currentLocation].Find(e => e.enemyBlueprint.enemyName.ToLower() == nounPhrase);
+            var stunnedEnemyTarget = FindByNoun(roomEnemiesState[currentLocation], e => e.enemyBlueprint.enemyName, nounPhrase, out ambiguous);
             if (stunnedEnemyTarget != null)
             {
                 EnemyAttackTurn(stunnedEnemyTarget);
@@ -47,10 +80,12 @@ public partial class GameController
             return;
         }
         // --- 2. Find the Target ---
-        var targetEnemy = roomEnemiesState[currentLocation].Find(e => e.enemyBlueprint.enemyName.ToLower() == nounPhrase);
+        var targetEnemy = FindByNoun(roomEnemiesState[currentLocation], e => e.enemyBlueprint.enemyName, nounPhrase, out ambiguous);
+        if (ambiguous) return;
         if (targetEnemy == null)
         {
-            var targetCharacter = roomCharactersState[currentLocation].Find(c => c.characterName.ToLower() == nounPhrase);
+            var targetCharacter = FindByNoun(roomCharactersState[currentLocation], c => c.characterName, nounPhrase, out ambiguous);
+            if (ambiguous) return;
             if (targetCharacter != null)
             {
                 LogText($"Attacking the {targetCharacter.characterName} seems like a terrible idea.");
@@ -72,50 +107,25 @@ public partial class GameController
         else
         {
             // If the attack hits, calculate and apply damage.
-            LogText($"You attack the {nounPhrase}!");
-            int totalPlayerBaseAttack = playerStats.baseAttack;
+            string enemyName = targetEnemy.enemyBlueprint.enemyName;
+            LogText($"You attack the {enemyName}!");
+            int totalPlayerBaseAttack = Mathf.Max(0, playerStats.baseAttack + GetAttackBonusFromEffects());
             int playerDamageDealt = Random.Range(totalPlayerBaseAttack - playerDamageVariance, totalPlayerBaseAttack + playerDamageVariance + 1);
             targetEnemy.currentHealth -= playerDamageDealt;
-            LogText($"You deal {playerDamageDealt} damage. The {nounPhrase} has {targetEnemy.currentHealth} health remaining.");
+            LogText($"You deal {playerDamageDealt} damage. The {enemyName} has {targetEnemy.currentHealth} health remaining.");
         }
         // --- 4. Check for Enemy Defeat ---
         if (targetEnemy.currentHealth <= 0)
         {
-            LogText($"You have defeated the {nounPhrase}!");
-            onEnemyDefeated.Invoke(targetEnemy);
-            GrantXp(targetEnemy.enemyBlueprint.xpReward);
-            // Drop loot
-            if (targetEnemy.enemyBlueprint.lootDrops.Count > 0)
-            {
-                foreach (Item itemToDrop in targetEnemy.enemyBlueprint.lootDrops)
-                {
-                    roomItemsState[currentLocation].Add(itemToDrop);
-                    LogText($"The {nounPhrase} dropped a <color={keywordColor}>{itemToDrop.itemName}</color>.", TextType.GameResponse);
-                }
-            }
-            // Reveal exit on death
-            if (!string.IsNullOrEmpty(targetEnemy.enemyBlueprint.exitDirectionToReveal))
-            {
-                string direction = targetEnemy.enemyBlueprint.exitDirectionToReveal.ToLower();
-                Exit exitToReveal = currentLocation.exits.FirstOrDefault(e => e.direction.ToLower() == direction);
-                if (exitToReveal != null)
-                {
-                    exitVisibilityState[exitToReveal] = true;
-                    LogText($"Defeating the {nounPhrase} has revealed a new exit to the {direction}!", TextType.GameResponse);
-                }
-            }
-            // Remove the defeated enemy from the room and refresh the view.
-            roomEnemiesState[currentLocation].Remove(targetEnemy);
-            DisplayLocation(useTypewriter: false);
+            ResolveEnemyDefeat(targetEnemy);
             return; // End the turn here since the enemy is defeated.
         }
         // --- 5. Enemy's Turn ---
         // If the enemy survived the player's attack, it gets to take its turn.
         // All of its AI logic is now handled in this single function call.
+        // (Status effects tick in real time from Update(), so no extra
+        // per-exchange processing is needed here.)
         EnemyAttackTurn(targetEnemy);
-        // --- 6. Process Status Effects ---
-        // After the full combat exchange, process any status effects on the player.
-        ProcessStatusEffects();
     }
 
     private void HandleCast(string nounPhrase)
@@ -146,8 +156,19 @@ public partial class GameController
         if (skillToCast.targetType == SkillTargetType.Enemy)
         {
             if (string.IsNullOrEmpty(targetName)) { LogText("That skill requires a target. (cast " + skillName + " on [target])"); return; }
-            target = roomEnemiesState[currentLocation].Find(e => e.enemyBlueprint.enemyName.ToLower() == targetName);
+            target = FindByNoun(roomEnemiesState[currentLocation], e => e.enemyBlueprint.enemyName, targetName, out bool ambiguous);
+            if (ambiguous) return;
             if (target == null) { LogText("There is no " + targetName + " here."); return; }
+        }
+
+        // Being stunned blocks spellcasting just like melee attacks. The stun
+        // is consumed, and a targeted enemy still gets its free turn.
+        if (isPlayerStunned)
+        {
+            LogText("You are stunned and cannot act!", TextType.GameResponse);
+            isPlayerStunned = false;
+            if (target != null) EnemyAttackTurn(target);
+            return;
         }
 
         // --- Execution ---
@@ -155,11 +176,53 @@ public partial class GameController
         LogText($"You cast {skillToCast.skillName}!", TextType.GameResponse);
         ProcessActiveSkillEffects(skillToCast, target);
 
-        // Give the enemy a turn if a targeted skill was used
+        // Give the enemy a turn if a targeted skill was used — but only if the
+        // spell didn't already kill it. A lethal cast resolves the defeat
+        // (loot/XP) and the corpse does not retaliate.
         if (target != null)
         {
+            if (target.currentHealth <= 0)
+            {
+                ResolveEnemyDefeat(target);
+                return;
+            }
             EnemyAttackTurn(target);
         }
+    }
+
+    // Runs the shared "enemy died" sequence: rewards, loot, exit reveal, and
+    // removal. Called from both melee (HandleAttack) and spells (HandleCast) so
+    // a killing blow resolves the same way regardless of how it was dealt.
+    private void ResolveEnemyDefeat(EnemyInstance targetEnemy)
+    {
+        string enemyName = targetEnemy.enemyBlueprint.enemyName;
+        LogText($"You have defeated the {enemyName}!");
+        onEnemyDefeated.Invoke(targetEnemy);
+        GrantXp(targetEnemy.enemyBlueprint.xpReward);
+        // Drop loot
+        if (targetEnemy.enemyBlueprint.lootDrops.Count > 0)
+        {
+            foreach (Item itemToDrop in targetEnemy.enemyBlueprint.lootDrops)
+            {
+                if (itemToDrop == null) continue;
+                roomItemsState[currentLocation].Add(new ItemInstance(itemToDrop));
+                LogText($"The {enemyName} dropped a <color={keywordColor}>{itemToDrop.itemName}</color>.", TextType.GameResponse);
+            }
+        }
+        // Reveal exit on death
+        if (!string.IsNullOrEmpty(targetEnemy.enemyBlueprint.exitDirectionToReveal))
+        {
+            string direction = targetEnemy.enemyBlueprint.exitDirectionToReveal.ToLower();
+            Exit exitToReveal = currentLocation.exits.FirstOrDefault(e => e.direction.ToLower() == direction);
+            if (exitToReveal != null)
+            {
+                exitVisibilityState[exitToReveal] = true;
+                LogText($"Defeating the {enemyName} has revealed a new exit to the {direction}!", TextType.GameResponse);
+            }
+        }
+        // Remove the defeated enemy from the room and refresh the view.
+        roomEnemiesState[currentLocation].Remove(targetEnemy);
+        DisplayLocation(useTypewriter: false);
     }
 
     private void ProcessActiveSkillEffects(Skill skill, EnemyInstance target)
@@ -285,14 +348,9 @@ public partial class GameController
                 LogText($"The {attacker.enemyBlueprint.enemyName} purges its negative effects!", TextType.GameResponse);
                 break;
             case AbilityEffect.ApplyDebuffToPlayer:
-                // This applies the linked status effect to the player
-                if (ability.effectToApplyOnSuccess != null && Random.value <= ability.effectToApplyOnSuccess.chanceToApply)
-                {
-                    ActiveStatusEffect newEffect = new ActiveStatusEffect(ability.effectToApplyOnSuccess);
-                    activeStatusEffects.Add(newEffect);
-                    LogText(newEffect.effect.applicationMessage);
-                    RecalculatePlayerStats(); // Recalculate stats immediately
-                }
+                // The linked status effect is applied by the shared
+                // effectToApplyOnSuccess block below (applying it here as well
+                // used to stack the debuff twice per use).
                 break;
             case AbilityEffect.ApplyBuffToSelf:
                 // This applies the linked status effect to the enemy itself.
@@ -313,19 +371,8 @@ public partial class GameController
     private void PerformStandardAttack(EnemyInstance attacker)
     {
         LogText($"The {attacker.enemyBlueprint.enemyName} attacks you!", TextType.GameResponse);
-        int armorDefense = (equippedArmor != null ? equippedArmor.defenseBonus : 0);
-        // We need to get the defense bonus from our RecalculatePlayerStats function.
-        // Let's assume you've already calculated it there.
-        // For clarity, let's just recalculate the specific part we need here.
-        int defense_bonus_from_effects = 0;
-        foreach (ActiveStatusEffect statusEffect in activeStatusEffects)
-        {
-            if (statusEffect.effect.effectType == EffectType.IncreaseDefense)
-                defense_bonus_from_effects += statusEffect.effect.magnitude;
-            else if (statusEffect.effect.effectType == EffectType.DecreaseDefense)
-                defense_bonus_from_effects -= statusEffect.effect.magnitude;
-        }
-        int finalPlayerDefense = armorDefense + defense_bonus_from_effects;
+        int armorDefense = (equippedArmor != null ? equippedArmor.blueprint.defenseBonus : 0);
+        int finalPlayerDefense = armorDefense + GetDefenseBonusFromEffects();
         int enemyDamageDealt = Random.Range(attacker.enemyBlueprint.baseAttack - attacker.enemyBlueprint.damageVariance, attacker.enemyBlueprint.baseAttack + attacker.enemyBlueprint.damageVariance + 1);
         // Make sure damage doesn't go below zero (which would cause healing)
         int damageTaken = Mathf.Max(0, enemyDamageDealt - finalPlayerDefense);
@@ -336,21 +383,6 @@ public partial class GameController
             LogText("You have been defeated... Your vision fades to black.");
             LogText("<color=red>G A M E   O V E R</color>", TextType.Narrative);
             currentGameState = GameState.GameOver;
-        }
-    }
-
-    private void ProcessStatusEffects()
-    {
-        // Loop backwards so we can safely remove expired effects
-        for (int i = activeStatusEffects.Count - 1; i >= 0; i--)
-        {
-            // Tick returns true when the effect has expired
-            if (activeStatusEffects[i].Tick(Time.deltaTime, this))
-            {
-                LogText($"{activeStatusEffects[i].effect.effectName} has worn off.",
-                        TextType.GameResponse);
-                activeStatusEffects.RemoveAt(i);
-            }
         }
     }
 

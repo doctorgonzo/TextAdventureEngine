@@ -14,6 +14,15 @@ public class ActiveStatusEffect
         this.tickTimer = effect.tickInterval;
     }
 
+    // Used when restoring a saved game: resumes with the saved remaining time
+    // instead of the effect's full duration.
+    public ActiveStatusEffect(StatusEffect effect, float remainingTime)
+    {
+        this.effect = effect;
+        this.remainingTime = remainingTime;
+        this.tickTimer = effect.tickInterval;
+    }
+
     public bool Tick(float deltaTime, GameController controller)
     {
         remainingTime -= deltaTime;

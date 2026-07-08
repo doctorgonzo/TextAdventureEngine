@@ -87,7 +87,9 @@ Game content lives as ScriptableObjects under `Assets/Resources/` (`Locations/`,
 
 ## Command reference
 
-Movement & world: `go <dir>`, `look [at <thing>]`, `take <item>`, `drop <item>`, `use <item> [on <target>]`, `push` / `pull` / `flush` / `activate <thing>`
+Movement & world: `go <dir>` (with `n`/`s`/`e`/`w`/`u`/`d` shortcuts), `look [at <thing>]`, `take <item>`, `drop <item>`, `use <item> [on <target>]`, `push` / `pull` / `flush` / `activate <thing>`
+
+The parser ignores articles (`take the lantern` works), accepts partial names (`attack gob` matches the goblin), and asks which one you meant when a partial name is ambiguous.
 
 Character: `inventory`, `equip` / `unequip <item>`, `equipment`, `status`, `char`, `skills`, `learn <skill>`, `cast <skill> [on <target>]`
 

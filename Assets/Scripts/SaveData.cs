@@ -3,15 +3,24 @@ using System.Collections.Generic;
 public class RoomInteractables
 {
     public string locationName;
-    public List<string> interactableNouns = new List<string>();
+    // Interactable asset names (not nouns), so two rooms can each have e.g. a
+    // "lever" without their saved state colliding.
+    public List<string> interactableNames = new List<string>();
 }
 [System.Serializable]
 public class SaveData
 {
     // --- Player State ---
-    public PlayerStats playerStats; // This single object replaces playerName, level, xp, currency, etc.
+    public PlayerStats playerStats; // Level, xp, currency, attributes, etc.
     public int playerCurrentHealth; // Still tracked separately.
+    public string playerName;
+    public float playerDrunkenness;
     public string currentLocationName;
+    // --- Quests ---
+    public List<ActiveQuestSaveState> activeQuests = new List<ActiveQuestSaveState>();
+    public List<string> completedQuestNames = new List<string>();
+    // --- Active Status Effects ---
+    public List<StatusEffectSaveState> activeStatusEffects = new List<StatusEffectSaveState>();
     // --- Learned Skills ---
     public List<string> learnedSkillNames = new List<string>();
     // --- Equipment State ---
@@ -56,8 +65,25 @@ public class ExitState
 [System.Serializable]
 public class InteractableState
 {
-    public string interactableNoun;
+    // Identified by location + asset name so identically-named interactables
+    // in different rooms stay independent.
+    public string locationName;
+    public string interactableName;
     public string state;
+}
+
+[System.Serializable]
+public class ActiveQuestSaveState
+{
+    public string questName; // Quest asset name
+    public List<bool> objectivesCompleted = new List<bool>();
+}
+
+[System.Serializable]
+public class StatusEffectSaveState
+{
+    public string effectName; // StatusEffect asset name
+    public float remainingTime;
 }
 
 [System.Serializable]
