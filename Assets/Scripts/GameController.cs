@@ -25,9 +25,10 @@ public class EnemyInstance
 }
 
 // GameController is split across partial files:
-//   GameController.cs          — lifecycle, input parsing, world/UI orchestration
-//   GameController.Combat.cs   — attack resolution, enemy AI, status effects
-//   GameController.Dialogue.cs — conversation flow and dialogue-node actions
+//   GameController.cs             — lifecycle, input parsing, world/UI orchestration
+//   GameController.Combat.cs      — attack resolution, enemy AI, status effects
+//   GameController.Dialogue.cs    — conversation flow and dialogue-node actions
+//   GameController.ConnectFour.cs — the Connect Four minigame and its AI
 // Combat and dialogue are kept as partials (rather than standalone classes)
 // because they mutate a large amount of shared player state; splitting the
 // files separates the concerns without threading that state through an
@@ -94,12 +95,6 @@ public partial class GameController : MonoBehaviour
     private ItemInstance equippedArmor;
     private List<string> commandHistory = new List<string>();
     private int historyIndex = 0;
-    private const int C4_ROWS = 6;
-    private const int C4_COLS = 7;
-    private int[,] connectFourBoard;
-    private bool isPlayerTurn = true;
-    // Display name of whoever the minigame was started against.
-    private string minigameOpponentName = "Your opponent";
     private bool isPlayerStunned = false;
     private List<Skill> learnedSkills = new List<Skill>();
     private Skill[] allSkills;
@@ -646,177 +641,6 @@ public partial class GameController : MonoBehaviour
         activeTrainer = null;
         DisplayLocation(useTypewriter: false);
     }
-
-    #region MiniGame Logic
-    void StartConnectFour()
-    {
-        currentGameState = GameState.MiniGame;
-        connectFourBoard = new int[C4_ROWS, C4_COLS];
-        isPlayerTurn = true; // Player always starts first in Connect Four.
-        // The minigame is reached from dialogue, so the opponent is whoever
-        // the player was talking to.
-        minigameOpponentName = activeConversationCharacter != null
-            ? activeConversationCharacter.characterName
-            : "Your opponent";
-        DisplayConnectFourBoard();
-    }
-    
-    void TakeAITurn()
-    {
-        isPlayerTurn = false; // Switch to AI's turn
-        StartCoroutine(AITurnCoroutine());
-    }
-
-    IEnumerator AITurnCoroutine()
-    {
-        // 1. "Think"
-        LogText($"{minigameOpponentName} is thinking...", TextType.Narrative);
-        yield return new WaitForSeconds(1.0f); // Wait for 1 second
-        // 2. Determine Move
-        List<int> validColumns = new List<int>();
-        for (int col = 0; col < C4_COLS; col++)
-        {
-            if (connectFourBoard[0, col] == 0) validColumns.Add(col);
-        }
-        int chosenColumn = validColumns[Random.Range(0, validColumns.Count)];
-        int chosenRow = -1;
-        for (int row = C4_ROWS - 1; row >= 0; row--)
-        {
-            if (connectFourBoard[row, chosenColumn] == 0) { chosenRow = row; break; }
-        }
-        // 3. Place Piece
-        connectFourBoard[chosenRow, chosenColumn] = 2; // 2 for AI
-        // 4. Display Board
-        DisplayConnectFourBoard();
-        // 5. Check for Win/Loss
-        if (CheckForWin(chosenRow, chosenColumn, 2))
-        {
-            ProcessMinigameEnd(playerWon: false);
-        }
-        else if (CheckForTie())
-        {
-            ProcessMinigameEnd(playerWon: false, isTie: true);
-        }
-        else
-        {
-            // 6. If game continues, give control back to the player.
-            isPlayerTurn = true;
-            LogText("Your turn.", TextType.Narrative, useTypewriter: false);
-        }
-    }
-
-    void ProcessMinigameEnd(bool playerWon, bool isTie = false)
-    {
-        string endMessage;
-        if (isTie) { endMessage = "The board is full. It's a draw!"; }
-        else if (playerWon) { endMessage = "You win! Congratulations!"; }
-        else { endMessage = $"{minigameOpponentName} wins! Better luck next time."; }
-        // Queue the two messages. They will now appear sequentially without glitches.
-        LogText(endMessage, TextType.GameResponse);
-        LogText("Press Enter to continue...", TextType.Narrative);
-        currentGameState = GameState.MinigamePostlude;
-    }
-
-    private bool CheckForWin(int row, int col, int playerID)
-    {
-        // Check Horizontal
-        int count = 0;
-        for (int c = 0; c < C4_COLS; c++)
-        {
-            if (connectFourBoard[row, c] == playerID) count++;
-            else count = 0;
-            if (count >= 4) return true;
-        }
-        // Check Vertical
-        count = 0;
-        for (int r = 0; r < C4_ROWS; r++)
-        {
-            if (connectFourBoard[r, col] == playerID) count++;
-            else count = 0;
-            if (count >= 4) return true;
-        }
-        // Check Diagonal (down-right)
-        count = 0;
-        for (int r = row, c = col; r < C4_ROWS && c < C4_COLS; r++, c++)
-        {
-            if (connectFourBoard[r, c] == playerID) count++;
-            else break;
-        }
-        for (int r = row - 1, c = col - 1; r >= 0 && c >= 0; r--, c--)
-        {
-            if (connectFourBoard[r, c] == playerID) count++;
-            else break;
-        }
-        if (count >= 4) return true;
-        // Check Diagonal (up-right)
-        count = 0;
-        for (int r = row, c = col; r >= 0 && c < C4_COLS; r--, c++)
-        {
-            if (connectFourBoard[r, c] == playerID) count++;
-            else break;
-        }
-        for (int r = row + 1, c = col - 1; r < C4_ROWS && c >= 0; r++, c--)
-        {
-            if (connectFourBoard[r, c] == playerID) count++;
-            else break;
-        }
-        if (count >= 4) return true;
-        return false; // No win found
-    }
-
-    private bool CheckForTie()
-    {
-        // A tie occurs if the top row is completely full.
-        for (int c = 0; c < C4_COLS; c++)
-        {
-            if (connectFourBoard[0, c] == 0) // If any spot in the top row is empty...
-            {
-                return false; // ...it's not a tie yet.
-            }
-        }
-        return true; // The top row is full, so the board is full.
-    }
-    
-    void EndConnectFour(string forfeitMessage = null)
-    {
-        currentGameState = GameState.Playing;
-        if (!string.IsNullOrEmpty(forfeitMessage))
-        {
-            LogText(forfeitMessage, TextType.Narrative);
-        }
-        DisplayLocation(useTypewriter: false); 
-    }
-
-    void DisplayConnectFourBoard()
-    {
-        StringBuilder boardText = new StringBuilder();
-        for (int row = 0; row < C4_ROWS; row++)
-        {
-            boardText.Append("|");
-            for (int col = 0; col < C4_COLS; col++)
-            {
-                switch (connectFourBoard[row, col])
-                {
-                    case 0:
-                        boardText.Append("<mspace=1.8em>.</mspace>");
-                        break;
-                    case 1:
-                        boardText.Append($"<mspace=1.8em><color={playerInputColor}>O</color></mspace>");
-                        break;
-                    case 2:
-                        boardText.Append($"<mspace=1.8em><color={enemyColor}>X</color></mspace>");
-                        break;
-                }
-                boardText.Append("|");
-            }
-            boardText.Append("\n");
-        }
-        boardText.Append("-----------------------------\n");
-        boardText.Append("|<mspace=1.8em>1</mspace>|<mspace=1.8em>2</mspace>|<mspace=1.8em>3</mspace>|<mspace=1.8em>4</mspace>|<mspace=1.8em>5</mspace>|<mspace=1.8em>6</mspace>|<mspace=1.8em>7</mspace>|\n");
-        boardText.Append("-----------------------------");
-        PrintToScreen(boardText.ToString(), useTypewriter: false);
-    }
-    #endregion
 
     #region Actions
     private void HandleCustomAction(CustomAction action, string nounPhrase)
@@ -2023,60 +1847,6 @@ public partial class GameController : MonoBehaviour
         // 6. Clamp current health and mana so they don't exceed the new maximums.
         playerCurrentHealth = Mathf.Min(playerCurrentHealth, playerStats.maxHealth);
         playerStats.currentMana = Mathf.Min(playerStats.currentMana, playerStats.maxMana);
-    }
-
-    void HandleMinigameMove(string inputText)
-    {
-        if (!isPlayerTurn)
-        {
-            LogText($"Wait for {minigameOpponentName} to make a move!", TextType.GameResponse);
-            return;
-        }
-        string formattedInput = inputText.ToLower();
-        if (formattedInput == "quit" || formattedInput == "q")
-        {
-            EndConnectFour("You forfeit the game and step away from the board.");
-            return;
-        }
-        // 1. Validate Input: Try to convert the input to a column number.
-        if (!int.TryParse(inputText, out int columnNumber) || columnNumber < 1 || columnNumber > C4_COLS)
-        {
-            LogText("Invalid move. Please type a column number from 1 to 7 or 'quit'");
-            return;
-        }
-        int chosenColumn = columnNumber - 1;
-        // 2. Find Available Row: Check for the lowest empty spot in that column.
-        int chosenRow = -1; // -1 means the column is full.
-        for (int row = C4_ROWS - 1; row >= 0; row--)
-        {
-            if (connectFourBoard[row, chosenColumn] == 0) // 0 means empty
-            {
-                chosenRow = row;
-                break;
-            }
-        }
-        // 3. Validate Move: Check if the column was full.
-        if (chosenRow == -1)
-        {
-            LogText("That column is full! Try another.");
-            return;
-        }
-        // 4. Place the Piece: Update the board state with the player's move.
-        connectFourBoard[chosenRow, chosenColumn] = 1; // 1 for player
-        // 5. Display the updated board.
-        DisplayConnectFourBoard();
-        if (CheckForWin(chosenRow, chosenColumn, 1))
-        {
-            ProcessMinigameEnd(playerWon: true);
-            return;
-        }
-
-        if (CheckForTie())
-        {
-            ProcessMinigameEnd(playerWon: false, isTie: true);
-            return;
-        }
-        TakeAITurn();
     }
 
     public void DisplayLocation(bool useTypewriter = true)
