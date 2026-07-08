@@ -55,7 +55,7 @@ Full game state serialized to JSON in Unity's persistent data path:
 - Loading is resilient: missing assets are skipped with warnings, and a save pointing at a deleted location falls back to the main start location.
 
 ### Connect Four minigame
-A built-in example of an alternate game mode reachable from dialogue, played against whichever character started it. The AI difficulty is set on the `GameController` in the inspector:
+A built-in example of an alternate game mode reachable from dialogue, played against whichever character started it. The AI difficulty is set **per NPC** on the `Character` asset, so some characters offer casual games and others are nearly unbeatable:
 
 | Difficulty | Behavior |
 |---|---|
@@ -99,7 +99,7 @@ Inside a shop: `buy <item>`, `sell <item>`, `leave`. With a trainer: `buy <skill
 | **Enemy** | `Resources/Enemies/` | Stats, evasion, AI behavior, attacks-on-sight, loot, XP, exit revealed on death |
 | **Enemy Behavior** | `Resources/Enemy Behaviors/` | Prioritized list of AI actions, each gated by conditions (own/player health thresholds) |
 | **Special Ability** | `Resources/Special Abilities/` | Enemy ability: heal, stun, mana drain, cleanse, buff/debuff, with magnitude and status effect payload |
-| **Character** | `Resources/Characters/` | Name, descriptions, starting dialogue node, hostile form (enemy), skills taught |
+| **Character** | `Resources/Characters/` | Name, descriptions, starting dialogue node, hostile form (enemy), skills taught, Connect Four skill |
 | **Dialogue Node** | `Resources/Dialogue/` | Text, player responses (each linking to a next node), required flags/items, failure node, actions on success |
 | **Quest** | `Resources/Quests/` | Name, description, objectives, currency/item/XP rewards |
 | **Skill** | `Resources/Skills/` | Passive (attribute bonus) or active (mana cost, target type, effect list), level requirement, point/coin cost |

@@ -3,18 +3,14 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
-// How well the Connect Four opponent plays. Selected on the GameController
-// in the inspector.
+// How well a Connect Four opponent plays. Set per NPC on the Character
+// asset, so different characters can offer easy, medium, or hard games.
 public enum ConnectFourDifficulty { Easy, Medium, Hard }
 
 // Connect Four minigame: board state, rendering, player input, and the AI
 // opponent. This is a partial of the same class defined in GameController.cs.
 public partial class GameController
 {
-    [Header("Minigame — Connect Four")]
-    [Tooltip("How well the Connect Four opponent plays. Easy picks random columns, Medium takes and blocks immediate wins, Hard searches ahead and plays almost perfectly.")]
-    public ConnectFourDifficulty connectFourDifficulty = ConnectFourDifficulty.Medium;
-
     private const int C4_ROWS = 6;
     private const int C4_COLS = 7;
     private const int C4_PLAYER = 1;
@@ -29,8 +25,10 @@ public partial class GameController
 
     private int[,] connectFourBoard;
     private bool isPlayerTurn = true;
-    // Display name of whoever the minigame was started against.
+    // Display name and skill of whoever the minigame was started against,
+    // captured from the Character asset when the game begins.
     private string minigameOpponentName = "Your opponent";
+    private ConnectFourDifficulty activeMinigameDifficulty = ConnectFourDifficulty.Medium;
 
     #region Game flow
     void StartConnectFour()
@@ -39,10 +37,18 @@ public partial class GameController
         connectFourBoard = new int[C4_ROWS, C4_COLS];
         isPlayerTurn = true; // Player always starts first in Connect Four.
         // The minigame is reached from dialogue, so the opponent is whoever
-        // the player was talking to.
-        minigameOpponentName = activeConversationCharacter != null
-            ? activeConversationCharacter.characterName
-            : "Your opponent";
+        // the player was talking to — their Character asset supplies both the
+        // display name and how well they play.
+        if (activeConversationCharacter != null)
+        {
+            minigameOpponentName = activeConversationCharacter.characterName;
+            activeMinigameDifficulty = activeConversationCharacter.connectFourDifficulty;
+        }
+        else
+        {
+            minigameOpponentName = "Your opponent";
+            activeMinigameDifficulty = ConnectFourDifficulty.Medium;
+        }
         DisplayConnectFourBoard();
     }
 
@@ -150,7 +156,7 @@ public partial class GameController
     private int ChooseAIColumn()
     {
         List<int> validColumns = GetValidColumns();
-        switch (connectFourDifficulty)
+        switch (activeMinigameDifficulty)
         {
             case ConnectFourDifficulty.Hard:
                 return ChooseHardColumn(validColumns);
