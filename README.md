@@ -70,7 +70,7 @@ A built-in example of an alternate game mode reachable from dialogue, played aga
 1. Install **Unity 6000.5.1f1** (or a compatible Unity 6 release).
 2. Clone the repo and open the project folder in Unity. (Unity-generated folders — `Library/`, `Temp/`, `Logs/`, builds — are excluded from version control and regenerate on first open.)
 3. Open the main scene under `Assets/Scenes/` and press **Play**.
-4. To build your own game: create content assets under `Assets/Resources/` (see below), wire rooms together in the **World Map Graph Editor**, and set the starting locations on the `GameController` in the scene.
+4. To build your own game: create content assets in a `Resources/` folder (see the authoring table below), wire rooms together in the **World Map Graph Editor**, and set the starting locations on the `GameController` in the scene.
 
 ---
 
@@ -90,7 +90,7 @@ Inside a shop: `buy <item>`, `sell <item>`, `leave`. With a trainer: `buy <skill
 
 ## Content authoring
 
-**All game content lives under `Assets/Resources/`** and is loaded into catalogs at startup — this single content home is what makes save/load restore-by-name work. Create assets via the `Assets ▸ Create ▸ Text Adventure` menu:
+**All game content lives inside a `Resources/` folder** using the subfolder names below, and is loaded into catalogs at startup — this single content home is what makes save/load restore-by-name work. The demo game's content is under `Assets/TextAdventureEngine/Demo/Resources/`; your own game's content can live in any `Resources/` folder with the same subfolder layout. Create assets via the `Assets ▸ Create ▸ Text Adventure` menu:
 
 | Asset type | Folder | What it defines |
 |---|---|---|
@@ -149,6 +149,8 @@ The runtime is organized around a central `GameController` with dedicated collab
 
 Combat, dialogue, and the minigame are partials (rather than standalone classes) because they mutate a large amount of shared player state; splitting the files separates the concerns without threading that state through an injected context.
 
+All runtime code lives in the **`TextEngine`** namespace and editor tooling in **`TextEngine.EditorTools`**, compiled into separate `TextEngine.Runtime` / `TextEngine.Editor` assemblies via asmdefs — so the engine imports cleanly into existing projects without class-name collisions.
+
 Two small wrapper classes keep runtime state off the shared assets: **`EnemyInstance`** (blueprint + current health) and **`ItemInstance`** (blueprint reference; the hook for future per-copy state like durability or charges). Rooms, shops, the inventory, and equipment slots all hold instances — ScriptableObject assets are never mutated at runtime.
 
 The parser resolves the typed verb through the `Action` catalog (keyword + synonyms), dispatches through a verb-handler table, and falls back to `CustomAction` assets — so the entire verb surface is data-driven.
@@ -159,10 +161,12 @@ The parser resolves the typed verb through the `Action` catalog (keyword + synon
 
 ```
 Assets/
-├── Editor/               Custom inspectors + World Map / Flag / Scenario windows
-├── Prefabs/
-├── Resources/            ALL game content (see authoring table above)
-├── Scenes/               Main scene + main menu
-├── Scripts/              Runtime code
+├── TextAdventureEngine/
+│   ├── Runtime/          Engine code (TextEngine namespace, TextEngine.Runtime asmdef)
+│   ├── Editor/           Custom inspectors + World Map / Flag / Scenario windows
+│   └── Demo/
+│       ├── Resources/    The demo game's content (see authoring table above)
+│       ├── Scenes/       Demo scene + main menu
+│       └── Prefabs/
 └── TextMesh Pro/
 ```
