@@ -237,6 +237,10 @@ namespace TextEngine.EditorTools
 
         private class DialogueGraphView : GraphView
         {
+            // Right-drag panning state (same interaction as the World Map editor).
+            private bool _rightPanning;
+            private Vector2 _lastPanPosition;
+
             public DialogueGraphView()
             {
                 this.AddManipulator(new ContentZoomer());
@@ -246,6 +250,44 @@ namespace TextEngine.EditorTools
                 var grid = new GridBackground();
                 Insert(0, grid);
                 grid.StretchToParentSize();
+
+                // Right-drag panning. Handled in the trickle-down (capture)
+                // phase so we consume the right mouse button before the
+                // built-in contextual menu can open; the menu's actions live
+                // on the toolbar, so nothing is lost.
+                RegisterCallback<MouseDownEvent>(OnRightPanDown, TrickleDown.TrickleDown);
+                RegisterCallback<MouseMoveEvent>(OnRightPanMove, TrickleDown.TrickleDown);
+                RegisterCallback<MouseUpEvent>(OnRightPanUp, TrickleDown.TrickleDown);
+                RegisterCallback<ContextualMenuPopulateEvent>(evt => evt.StopImmediatePropagation());
+            }
+
+            private void OnRightPanDown(MouseDownEvent evt)
+            {
+                if (evt.button != (int)MouseButton.RightMouse) return;
+                _rightPanning = true;
+                _lastPanPosition = evt.mousePosition;
+                this.CaptureMouse();
+                evt.StopImmediatePropagation();
+            }
+
+            private void OnRightPanMove(MouseMoveEvent evt)
+            {
+                if (!_rightPanning) return;
+                Vector2 delta = evt.mousePosition - _lastPanPosition;
+                _lastPanPosition = evt.mousePosition;
+                // Move the canvas by the mouse delta (scale is unchanged).
+#pragma warning disable 618 // GraphView still exposes the view transform only via ITransform
+                UpdateViewTransform(viewTransform.position + (Vector3)delta, viewTransform.scale);
+#pragma warning restore 618
+                evt.StopImmediatePropagation();
+            }
+
+            private void OnRightPanUp(MouseUpEvent evt)
+            {
+                if (!_rightPanning || evt.button != (int)MouseButton.RightMouse) return;
+                _rightPanning = false;
+                this.ReleaseMouse();
+                evt.StopImmediatePropagation();
             }
 
             public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter)

@@ -21,3 +21,4 @@ MonoBehaviour:
   failureNode: {fileID: 0}
   requiredFlags: []
   flagsToSet: []
+  editorPosition: {x: 0, y: 0}
