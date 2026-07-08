@@ -5,11 +5,10 @@ namespace TextEngine.EditorTools
     using UnityEditor;
     using UnityEngine;
     using System.Linq;
-    using System.Threading.Tasks;
 
     /// <summary>
-    /// A streamlined Editor window for loading TextEngine scenarios in Play Mode,
-    /// with an automatic "space" press shortly after load to advance UI.
+    /// A streamlined Editor window for loading TextEngine scenarios in Play
+    /// Mode. Displays the scenario instantly (no typewriter).
     /// </summary>
     public class ScenarioLoaderWindow : EditorWindow
     {
@@ -29,12 +28,16 @@ namespace TextEngine.EditorTools
         }
 
         /// <summary>
-        /// Loads all TextEngineScenario assets from Resources/Scenarios folder.
+        /// Loads all TextEngineScenario assets from Resources/Scenarios folders.
         /// </summary>
         private void RefreshScenarioList()
         {
             scenarios = Resources.LoadAll<TextEngineScenario>("Scenarios");
-            scenarioNames = scenarios.Select(s => s.scenarioName).ToArray();
+            // Fall back to the asset name when the display name is blank so the
+            // dropdown never shows empty entries.
+            scenarioNames = scenarios
+                .Select(s => string.IsNullOrEmpty(s.scenarioName) ? s.name : s.scenarioName)
+                .ToArray();
             selectedIndex = scenarios.Length > 0 ? 0 : -1;
         }
 
@@ -52,56 +55,40 @@ namespace TextEngine.EditorTools
             // Scenario dropdown
             selectedIndex = EditorGUILayout.Popup("Scenario", selectedIndex, scenarioNames);
 
-            // Load button
-            if (GUILayout.Button("Load Selected Scenario"))
+            // Load button — only usable in Play Mode.
+            using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
             {
-                LoadSelectedScenario();
+                if (GUILayout.Button("Load Selected Scenario"))
+                {
+                    LoadSelectedScenario();
+                }
+            }
+            if (!EditorApplication.isPlaying)
+            {
+                EditorGUILayout.HelpBox("Enter Play Mode to load scenarios.", MessageType.Info);
             }
 
-            // Optional: Refresh list
             if (GUILayout.Button("Refresh List")) RefreshScenarioList();
         }
 
         /// <summary>
-        /// Invokes GameController.LoadScenario on the selected SO,
-        /// skipping the typewriter effect and auto-pressing space shortly after.
+        /// Invokes GameController.LoadScenario on the selected scenario and
+        /// finishes any streaming text so the result is visible immediately.
         /// </summary>
         private void LoadSelectedScenario()
         {
-            if (!EditorApplication.isPlaying)
-            {
-                Debug.LogWarning("Enter Play Mode to load scenarios.");
-                return;
-            }
-
-            var controller = Object.FindObjectOfType<GameController>();
+            var controller = Object.FindFirstObjectByType<GameController>();
             if (controller == null)
             {
-                Debug.LogError("No GameController found in the scene.");
+                Debug.LogError("[Text Engine] No GameController found in the scene.");
                 return;
             }
 
             var scenario = scenarios[selectedIndex];
-
-            // Load the scenario data (sets currentLocation, inventory, enemies, health)
+            // LoadScenario rebuilds the world state and displays the location.
             controller.LoadScenario(scenario);
-            // Rebuild world/UI and display description instantly
-            controller.DisplayLocation(useTypewriter: false);
-
-            Debug.Log($"Loaded scenario: {scenario.scenarioName} (instant display)");
-
-            // After a short delay, simulate a space-bar press to advance any UI
-            Task.Delay(250).ContinueWith(_ => {
-                EditorApplication.delayCall += () => {
-                    var ctrl = Object.FindObjectOfType<GameController>();
-                    if (ctrl != null)
-                    {
-                        // Simulate pressing space to advance text or close dialogs
-                        ctrl.ParsePlayerCommand(" ");
-                        Debug.Log("Auto-pressed space after scenario load");
-                    }
-                };
-            });
+            controller.SkipTypewriter();
+            Debug.Log($"[Text Engine] Loaded scenario: {scenario.scenarioName}");
         }
     }
 }

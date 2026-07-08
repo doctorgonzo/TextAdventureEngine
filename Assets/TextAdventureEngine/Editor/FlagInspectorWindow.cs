@@ -2,119 +2,103 @@ namespace TextEngine.EditorTools
 {
     using TextEngine;
 
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using UnityEditor;
     using UnityEngine;
-    using System;
-    using System.Linq;
-    using System.Reflection;
-    using System.Collections.Generic;
 
     /// <summary>
-    /// Editor window for viewing and toggling **all** worldFlags in the GameController at runtime,
-    /// including those set to false. Supports filtering, refresh, save, and clear.
-    /// Optionally reads a public "definedFlags" array on GameController for a master list of flags.
+    /// Runtime debugging window: view and toggle every world flag while the
+    /// game is playing. The list merges the FlagRegistry master list with
+    /// whatever flags the running game has actually set, and repaints live so
+    /// flags flipped by gameplay show up as they happen.
     /// </summary>
     public class FlagInspectorWindow : EditorWindow
     {
         private Vector2 scrollPos;
         private string filter = string.Empty;
         private GameController controller;
-        private List<string> allFlags = new List<string>();
 
         [MenuItem("Window/Flag Inspector")]
         public static void ShowWindow() => GetWindow<FlagInspectorWindow>("Flag Inspector");
 
         private void OnEnable()
         {
-            RefreshFlags();
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            FindController();
         }
 
-        /// <summary>
-        /// Reloads the worldFlags dictionary and captures all keys, even false ones,
-        /// sourcing from a definedFlags array on the GameController if present.
-        /// </summary>
-        private void RefreshFlags()
+        private void OnDisable()
         {
-            controller = UnityEngine.Object.FindObjectOfType<GameController>();
-            if (controller == null)
-            {
-                allFlags.Clear();
-                return;
-            }
+            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+        }
 
-            // Load the master registry of flags from Resources/GlobalFlagRegistry
+        private void OnPlayModeChanged(PlayModeStateChange change)
+        {
+            FindController();
+            Repaint();
+        }
+
+        // Called ~10x/sec while the window is visible — keeps the display in
+        // sync with flags the running game sets.
+        private void OnInspectorUpdate()
+        {
+            if (EditorApplication.isPlaying) Repaint();
+        }
+
+        private void FindController()
+        {
+            controller = UnityEngine.Object.FindFirstObjectByType<GameController>();
+        }
+
+        // Registry flags + any runtime-set flags the registry doesn't know about.
+        private List<string> GatherFlagNames()
+        {
+            var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
             var registry = Resources.Load<FlagRegistry>("GlobalFlagRegistry");
-            if (registry != null && registry.flags != null && registry.flags.Count > 0)
+            if (registry != null && registry.flags != null)
             {
-                allFlags = registry.flags.OrderBy(k => k).ToList();
+                foreach (var flag in registry.flags)
+                {
+                    if (!string.IsNullOrEmpty(flag)) names.Add(flag);
+                }
             }
-            else
+            if (controller != null)
             {
-                // Fallback to runtime flags in the worldFlags dictionary
-                var flagsDict = GetWorldFlags();
-                allFlags = flagsDict != null
-                    ? flagsDict.Keys.OrderBy(k => k).ToList()
-                    : new List<string>();
+                foreach (var flag in controller.RuntimeFlagNames) names.Add(flag);
             }
-        }
-
-        /// <summary>
-        /// Resolves the controller's worldFlags dictionary via reflection. Handles
-        /// worldFlags being exposed either as a private field or (since the
-        /// WorldState refactor) as a private forwarding property.
-        /// </summary>
-        private Dictionary<string, bool> GetWorldFlags()
-        {
-            if (controller == null) return null;
-            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-            object value =
-                typeof(GameController).GetProperty("worldFlags", flags)?.GetValue(controller)
-                ?? typeof(GameController).GetField("worldFlags", flags)?.GetValue(controller);
-            return value as Dictionary<string, bool>;
+            return names.ToList();
         }
 
         private void OnGUI()
         {
             GUILayout.Label("World Flags Inspector", EditorStyles.boldLabel);
 
-            if (controller == null)
+            if (controller == null) FindController();
+            if (!EditorApplication.isPlaying || controller == null)
             {
-                EditorGUILayout.HelpBox("No GameController found in the scene.", MessageType.Warning);
-                if (GUILayout.Button("Refresh")) RefreshFlags();
+                EditorGUILayout.HelpBox("Enter Play Mode with a GameController in the scene to inspect and toggle flags.", MessageType.Info);
                 return;
             }
 
             EditorGUILayout.BeginHorizontal();
             filter = EditorGUILayout.TextField("Filter", filter);
             if (GUILayout.Button("Clear", GUILayout.Width(50))) filter = string.Empty;
-            if (GUILayout.Button("Refresh", GUILayout.Width(70))) RefreshFlags();
-            if (GUILayout.Button("Save Flags", GUILayout.Width(80)))
-            {
-                EditorUtility.SetDirty(controller);
-                AssetDatabase.SaveAssets();
-            }
             EditorGUILayout.EndHorizontal();
 
-            var flagsDict = GetWorldFlags();
-            if (flagsDict == null)
-            {
-                EditorGUILayout.HelpBox("worldFlags dictionary not found.", MessageType.Error);
-                return;
-            }
-
             scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
-            foreach (var key in allFlags)
+            foreach (var key in GatherFlagNames())
             {
                 if (!string.IsNullOrEmpty(filter) &&
                     key.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
                     continue;
 
-                bool currentValue = flagsDict.ContainsKey(key) ? flagsDict[key] : false;
+                bool currentValue = controller.GetWorldFlag(key);
                 bool newValue = EditorGUILayout.ToggleLeft(key, currentValue);
                 if (newValue != currentValue)
                 {
-                    flagsDict[key] = newValue;
-                    EditorUtility.SetDirty(controller);
+                    controller.SetWorldFlag(key, newValue);
                 }
             }
             EditorGUILayout.EndScrollView();

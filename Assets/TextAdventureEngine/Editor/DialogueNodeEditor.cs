@@ -20,15 +20,9 @@ namespace TextEngine.EditorTools
                 .Select(guid => AssetDatabase.LoadAssetAtPath<FlagRegistry>(AssetDatabase.GUIDToAssetPath(guid)))
                 .FirstOrDefault();
 
-            if (flagRegistry != null)
-            {
-                flagOptions = flagRegistry.flags.ToArray();
-            }
-            else
-            {
-                // Provide a fallback if the registry isn't found.
-                flagOptions = new string[] { "ERROR: FlagRegistry asset not found!" };
-            }
+            // With no registry the flag lists fall back to plain text fields —
+            // never inject placeholder strings that could be written into data.
+            flagOptions = flagRegistry != null ? flagRegistry.flags.ToArray() : new string[0];
         }
 
         public override void OnInspectorGUI()
@@ -77,20 +71,50 @@ namespace TextEngine.EditorTools
                 // Draw the "Size" field. A user can still type the size here if they want.
                 EditorGUILayout.PropertyField(listProperty.FindPropertyRelative("Array.size"));
 
+                if (flagOptions.Length == 0)
+                {
+                    EditorGUILayout.HelpBox("No FlagRegistry asset found. Create one via Assets ▸ Create ▸ Text Adventure ▸ Flag Registry to get flag dropdowns; plain text fields are shown for now.", MessageType.Warning);
+                }
+
                 // Loop through each element in the list and draw it as a dropdown.
                 for (int i = 0; i < listProperty.arraySize; i++)
                 {
                     SerializedProperty element = listProperty.GetArrayElementAtIndex(i);
                     string currentValue = element.stringValue;
 
-                    int currentIndex = System.Array.IndexOf(flagOptions, currentValue);
-                    if (currentIndex < 0) { currentIndex = 0; } // Default to first entry if not found
-
-                    int newIndex = EditorGUILayout.Popup($"Element {i}", currentIndex, flagOptions);
-
-                    if (newIndex != currentIndex)
+                    // Without a registry, fall back to editing the raw string.
+                    if (flagOptions.Length == 0)
                     {
-                        element.stringValue = flagOptions[newIndex];
+                        EditorGUILayout.PropertyField(element, new GUIContent($"Element {i}"));
+                        continue;
+                    }
+
+                    int currentIndex = System.Array.IndexOf(flagOptions, currentValue);
+                    if (currentIndex >= 0)
+                    {
+                        int newIndex = EditorGUILayout.Popup($"Element {i}", currentIndex, flagOptions);
+                        if (newIndex != currentIndex)
+                        {
+                            element.stringValue = flagOptions[newIndex];
+                        }
+                    }
+                    else
+                    {
+                        // The stored value is empty or missing from the registry.
+                        // Show it as an explicit placeholder entry so drawing the
+                        // inspector never silently rewrites data — the value only
+                        // changes when the user actively picks a real flag.
+                        string placeholder = string.IsNullOrEmpty(currentValue)
+                            ? "(select a flag)"
+                            : $"(missing from registry: {currentValue})";
+                        string[] options = new string[flagOptions.Length + 1];
+                        options[0] = placeholder;
+                        System.Array.Copy(flagOptions, 0, options, 1, flagOptions.Length);
+                        int picked = EditorGUILayout.Popup($"Element {i}", 0, options);
+                        if (picked > 0)
+                        {
+                            element.stringValue = flagOptions[picked - 1];
+                        }
                     }
                 }
 

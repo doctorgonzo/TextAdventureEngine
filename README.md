@@ -151,6 +151,8 @@ Combat, dialogue, and the minigame are partials (rather than standalone classes)
 
 All runtime code lives in the **`TextEngine`** namespace and editor tooling in **`TextEngine.EditorTools`**, compiled into separate `TextEngine.Runtime` / `TextEngine.Editor` assemblies via asmdefs — so the engine imports cleanly into existing projects without class-name collisions.
 
+An **EditMode test suite** (`TextEngine.Tests`, visible in `Window ▸ General ▸ Test Runner`) covers the Connect Four AI, the noun matcher, the content catalogs (including a duplicate-asset-name check, since saves are name-keyed), and save-file round-tripping. Save files carry a **format version** for forward migration, and the `GameController` validates its scene wiring on startup with actionable `[Text Engine]` errors instead of exceptions.
+
 Two small wrapper classes keep runtime state off the shared assets: **`EnemyInstance`** (blueprint + current health) and **`ItemInstance`** (blueprint reference; the hook for future per-copy state like durability or charges). Rooms, shops, the inventory, and equipment slots all hold instances — ScriptableObject assets are never mutated at runtime.
 
 The parser resolves the typed verb through the `Action` catalog (keyword + synonyms), dispatches through a verb-handler table, and falls back to `CustomAction` assets — so the entire verb surface is data-driven.

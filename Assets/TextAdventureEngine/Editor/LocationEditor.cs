@@ -137,12 +137,22 @@ namespace TextEngine.EditorTools
 
         private void ResetNewExit(SerializedProperty exitProperty)
         {
+            // Unity's '+' button clones the previous element, so EVERY field
+            // must be reset — a cloned InstaDeath or locked exit would silently
+            // carry that configuration into the innocent new exit.
             exitProperty.FindPropertyRelative("direction").stringValue = "";
             exitProperty.FindPropertyRelative("destination").objectReferenceValue = null;
             exitProperty.FindPropertyRelative("isLocked").boolValue = false;
             exitProperty.FindPropertyRelative("keyToUnlock").objectReferenceValue = null;
             exitProperty.FindPropertyRelative("lockedDescription").stringValue = "";
             exitProperty.FindPropertyRelative("isHidden").boolValue = false;
+            exitProperty.FindPropertyRelative("exitAction").enumValueIndex = (int)ExitActionType.None;
+            exitProperty.FindPropertyRelative("deathMessage").stringValue = "";
+            exitProperty.FindPropertyRelative("blockingItem").objectReferenceValue = null;
+            exitProperty.FindPropertyRelative("blockedMessage").stringValue = "";
+            exitProperty.FindPropertyRelative("targetLocation").objectReferenceValue = null;
+            exitProperty.FindPropertyRelative("itemsToReveal").ClearArray();
+            exitProperty.FindPropertyRelative("stateChangeMessage").stringValue = "";
         }
 
         private void CreateAndAssignNewLocation(SerializedProperty exitsProperty)

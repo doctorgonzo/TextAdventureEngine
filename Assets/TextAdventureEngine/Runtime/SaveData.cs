@@ -12,6 +12,11 @@ namespace TextEngine
     [System.Serializable]
     public class SaveData
     {
+        // Bump whenever the save format changes shape. HandleLoad warns on a
+        // mismatch and future versions get a place to hang migrations.
+        public const int CurrentVersion = 1;
+        public int version = CurrentVersion;
+
         // --- Player State ---
         public PlayerStats playerStats; // Level, xp, currency, attributes, etc.
         public int playerCurrentHealth; // Still tracked separately.

@@ -72,11 +72,16 @@ namespace TextEngine.EditorTools
             graphView.style.flexGrow = 1;
             rootVisualElement.Add(graphView);
 
+            // Rebuild the picture after undo/redo so the graph always matches
+            // the underlying Location assets.
+            Undo.undoRedoPerformed += LoadGraph;
+
             LoadGraph();
         }
 
         private void OnDisable()
         {
+            Undo.undoRedoPerformed -= LoadGraph;
             if (graphView != null)
             {
                 rootVisualElement.Remove(graphView);
@@ -148,19 +153,34 @@ namespace TextEngine.EditorTools
                    loc.exits.Any(x => x != null && x.direction.Equals(direction, StringComparison.OrdinalIgnoreCase));
         }
 
-        /// <summary>Sets (replacing any existing) the exit for a direction on a location.</summary>
+        /// <summary>
+        /// Points a direction on a location at a destination. If an exit for
+        /// that direction already exists it is retargeted in place — its
+        /// lock/hidden/action configuration is preserved — otherwise a new
+        /// exit is added. Undo-able.
+        /// </summary>
         private static void SetExit(Location loc, string direction, Location destination)
         {
-            var exits = (loc.exits ?? new Exit[0]).ToList();
-            exits.RemoveAll(x => x != null && x.direction.Equals(direction, StringComparison.OrdinalIgnoreCase));
-            exits.Add(new Exit { direction = direction, destination = destination });
-            loc.exits = exits.ToArray();
+            Undo.RecordObject(loc, "Set Exit");
+            var existing = loc.exits?.FirstOrDefault(x =>
+                x != null && x.direction.Equals(direction, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                existing.destination = destination;
+            }
+            else
+            {
+                var exits = (loc.exits ?? new Exit[0]).ToList();
+                exits.Add(new Exit { direction = direction, destination = destination });
+                loc.exits = exits.ToArray();
+            }
             EditorUtility.SetDirty(loc);
         }
 
         private static void RemoveExit(Location loc, string direction, Location destination)
         {
             if (loc.exits == null) return;
+            Undo.RecordObject(loc, "Remove Exit");
             var exits = loc.exits.ToList();
             exits.RemoveAll(x => x != null &&
                                  x.direction.Equals(direction, StringComparison.OrdinalIgnoreCase) &&
@@ -212,6 +232,7 @@ namespace TextEngine.EditorTools
             var nodes = graphView.nodes.OfType<LocationNode>().ToList();
             if (nodes.Count == 0) return;
 
+            Undo.RecordObjects(nodes.Select(n => (UnityEngine.Object)n.Location).ToArray(), "Auto-Arrange World Map");
             int cols = Mathf.CeilToInt(Mathf.Sqrt(nodes.Count));
             for (int i = 0; i < nodes.Count; i++)
             {
@@ -384,6 +405,7 @@ namespace TextEngine.EditorTools
                     var newPos = GetPosition().position;
                     if (loc.editorPosition != newPos)
                     {
+                        Undo.RecordObject(loc, "Move Location Node");
                         loc.editorPosition = newPos;
                         EditorUtility.SetDirty(loc);
                     }

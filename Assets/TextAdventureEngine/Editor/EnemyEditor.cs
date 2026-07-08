@@ -66,9 +66,6 @@ namespace TextEngine.EditorTools
                 }
             }
             EditorGUILayout.PropertyField(attacksOnSight);
-            // --- NEW: Auto-Attack Section ---
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Auto-Attack Behavior", EditorStyles.boldLabel);
             EditorGUILayout.Space();
             // --- Loot Drops Section ---
             EditorGUILayout.LabelField("Loot & Death", EditorStyles.boldLabel);

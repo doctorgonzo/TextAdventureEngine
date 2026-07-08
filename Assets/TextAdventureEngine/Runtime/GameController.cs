@@ -141,8 +141,27 @@ namespace TextEngine
         #endregion
 
         #region Unity Lifecycle Methods
+        // Friendly setup errors beat NullReferenceExceptions: every inspector
+        // reference the engine cannot run without is checked up front, and the
+        // component disables itself rather than spraying exceptions every frame.
+        bool ValidateSceneSetup()
+        {
+            bool valid = true;
+            if (displayText == null) { Debug.LogError("[Text Engine] 'Display Text' is not assigned on the GameController.", this); valid = false; }
+            if (inputField == null) { Debug.LogError("[Text Engine] 'Input Field' is not assigned on the GameController.", this); valid = false; }
+            if (scrollRect == null) { Debug.LogError("[Text Engine] 'Scroll Rect' is not assigned on the GameController.", this); valid = false; }
+            if (engineSettings == null) { Debug.LogError("[Text Engine] 'Engine Settings' is not assigned on the GameController. Create one via Assets ▸ Create ▸ Text Adventure ▸ Engine Settings.", this); valid = false; }
+            if (tutorialStartLocation == null && mainGameStartLocation == null) { Debug.LogError("[Text Engine] No starting Location is assigned on the GameController.", this); valid = false; }
+            return valid;
+        }
+
         void Awake()
         {
+            if (!ValidateSceneSetup())
+            {
+                enabled = false; // also suppresses Start() and Update()
+                return;
+            }
             wobblyTextEffect = displayText.GetComponent<WobblyText>();
             if (wobblyTextEffect == null)
             {
@@ -287,6 +306,24 @@ namespace TextEngine
         void PrintToScreen(string textToPrint, bool useTypewriter = true)
         {
             textRenderer.Print(textToPrint, useTypewriter);
+        }
+
+        // Lets editor tooling (e.g. the Scenario Loader) finish any streaming
+        // text immediately — the same as the player pressing space.
+        public void SkipTypewriter()
+        {
+            if (textRenderer != null && textRenderer.IsProcessing) textRenderer.SkipToEnd();
+        }
+
+        // Editor tooling (the Flag Inspector) reads and toggles world flags
+        // through these instead of reflecting into private state.
+        public IEnumerable<string> RuntimeFlagNames =>
+            world != null ? (IEnumerable<string>)worldFlags.Keys : new string[0];
+        public bool GetWorldFlag(string flagName) =>
+            world != null && worldFlags.TryGetValue(flagName, out bool value) && value;
+        public void SetWorldFlag(string flagName, bool value)
+        {
+            if (world != null) worldFlags[flagName] = value;
         }
 
         string ProcessPlayerName(string text)
@@ -489,31 +526,19 @@ namespace TextEngine
             LogText("I don't understand the word '" + verb + "'.");
         }
 
-        // Resolves a player-typed noun phrase against a collection, preferring an
-        // exact (case-insensitive) name match, then names starting with the
-        // phrase, then names containing it. When the best tier holds more than one
-        // distinct name, prints a clarifying question and reports ambiguity so the
-        // caller can stop without printing its own "not found" message.
+        // Resolves a player-typed noun phrase via NounMatcher (exact, then
+        // prefix, then substring). On ambiguity, prints the clarifying
+        // question and reports it so the caller can stop without printing its
+        // own "not found" message.
         private T FindByNoun<T>(IEnumerable<T> source, System.Func<T, string> nameOf, string nounPhrase, out bool ambiguous)
         {
-            ambiguous = false;
-            if (string.IsNullOrEmpty(nounPhrase) || source == null) return default;
-            string phrase = nounPhrase.ToLower();
-            var named = source.Where(x => x != null && !string.IsNullOrEmpty(nameOf(x))).ToList();
-            var matches = named.Where(x => nameOf(x).ToLower() == phrase).ToList();
-            if (matches.Count == 0)
-                matches = named.Where(x => nameOf(x).ToLower().StartsWith(phrase)).ToList();
-            if (matches.Count == 0)
-                matches = named.Where(x => nameOf(x).ToLower().Contains(phrase)).ToList();
-            if (matches.Count == 0) return default;
-            var distinctNames = matches.Select(nameOf).Distinct(System.StringComparer.OrdinalIgnoreCase).ToList();
-            if (distinctNames.Count > 1)
+            T match = NounMatcher.Find(source, nameOf, nounPhrase, out List<string> ambiguousNames);
+            ambiguous = ambiguousNames != null;
+            if (ambiguous)
             {
-                ambiguous = true;
-                LogText($"Which do you mean: {string.Join(", ", distinctNames)}?");
-                return default;
+                LogText($"Which do you mean: {string.Join(", ", ambiguousNames)}?");
             }
-            return matches[0];
+            return match;
         }
 
         void EnterShopMode(Location shop)
@@ -1046,8 +1071,17 @@ namespace TextEngine
                 .ToList()
               ?? new List<string>();
             // --- Finalize: hand the snapshot to the save system to persist. ---
-            saveSystem.Write(saveData);
-            LogText("Game saved.");
+            saveData.version = SaveData.CurrentVersion;
+            try
+            {
+                saveSystem.Write(saveData);
+                LogText("Game saved.");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[Text Engine] Save failed: {e.Message}", this);
+                LogText("Save failed — see the console for details.", TextType.GameResponse);
+            }
         }
 
         public void HandleLoad()
@@ -1057,6 +1091,10 @@ namespace TextEngine
             {
                 LogText("No save game found.");
                 return;
+            }
+            if (saveData.version != SaveData.CurrentVersion)
+            {
+                Debug.LogWarning($"[Text Engine] Save file is version {saveData.version}, current is {SaveData.CurrentVersion}. Loading anyway; unrecognized data is skipped and missing data falls back to defaults.");
             }
             InitializeGame();
             // --- 1. Load Player & World State ---
