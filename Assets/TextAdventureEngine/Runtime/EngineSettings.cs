@@ -77,5 +77,9 @@ namespace TextEngine
         public int staminaPerLevel = 1;
         [Tooltip("Skill points granted on each level up.")]
         public int skillPointsPerLevel = 1;
+
+        [Header("Editor Tooling")]
+        [Tooltip("Where the editor tools (World Map Graph Editor, inspector 'Create and Add' buttons) place newly created content assets. Must be inside a folder named 'Resources' so the engine's catalogs can load it. Point this at your own game's content folder.")]
+        public string contentRootFolder = "Assets/TextAdventureEngine/Demo/Resources";
     }
 }

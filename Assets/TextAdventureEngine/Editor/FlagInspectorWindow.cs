@@ -49,7 +49,7 @@ namespace TextEngine.EditorTools
 
         private void FindController()
         {
-            controller = UnityEngine.Object.FindFirstObjectByType<GameController>();
+            controller = UnityEngine.Object.FindAnyObjectByType<GameController>();
         }
 
         // Registry flags + any runtime-set flags the registry doesn't know about.

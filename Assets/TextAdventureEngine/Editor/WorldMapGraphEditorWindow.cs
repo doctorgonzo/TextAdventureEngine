@@ -321,7 +321,9 @@ namespace TextEngine.EditorTools
                 Vector2 delta = evt.mousePosition - _lastPanPosition;
                 _lastPanPosition = evt.mousePosition;
                 // Move the canvas by the mouse delta (scale is unchanged).
+#pragma warning disable 618 // GraphView still exposes the view transform only via ITransform
                 UpdateViewTransform(viewTransform.position + (Vector3)delta, viewTransform.scale);
+#pragma warning restore 618
                 evt.StopImmediatePropagation();
             }
 

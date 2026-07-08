@@ -217,11 +217,51 @@ namespace TextEngine
             inputField.ActivateInputField();
         }
 
+        // Keyboard polling is isolated here so the engine works under either
+        // input backend: the legacy Input Manager when it is active, otherwise
+        // the Input System package (TEXTENGINE_INPUTSYSTEM is defined by the
+        // asmdef version-define whenever com.unity.inputsystem is installed).
+        private static bool UpArrowPressed()
+        {
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKeyDown(KeyCode.UpArrow);
+#elif TEXTENGINE_INPUTSYSTEM
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            return kb != null && kb.upArrowKey.wasPressedThisFrame;
+#else
+            return false;
+#endif
+        }
+
+        private static bool DownArrowPressed()
+        {
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKeyDown(KeyCode.DownArrow);
+#elif TEXTENGINE_INPUTSYSTEM
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            return kb != null && kb.downArrowKey.wasPressedThisFrame;
+#else
+            return false;
+#endif
+        }
+
+        private static bool SpacePressed()
+        {
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKeyDown(KeyCode.Space);
+#elif TEXTENGINE_INPUTSYSTEM
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            return kb != null && kb.spaceKey.wasPressedThisFrame;
+#else
+            return false;
+#endif
+        }
+
         void Update()
         {
             if (inputField.isFocused)
             {
-                if (Input.GetKeyDown(KeyCode.UpArrow))
+                if (UpArrowPressed())
                 {
                     // Move backward in history
                     historyIndex--;
@@ -232,7 +272,7 @@ namespace TextEngine
                         inputField.caretPosition = inputField.text.Length; // Move cursor to end
                     }
                 }
-                else if (Input.GetKeyDown(KeyCode.DownArrow))
+                else if (DownArrowPressed())
                 {
                     // Move forward in history
                     historyIndex++;
@@ -249,7 +289,7 @@ namespace TextEngine
                     }
                 }
             }
-            if (Input.GetKeyDown(KeyCode.Space) && textRenderer.IsProcessing)
+            if (SpacePressed() && textRenderer.IsProcessing)
             {
                 textRenderer.SkipToEnd();
             }

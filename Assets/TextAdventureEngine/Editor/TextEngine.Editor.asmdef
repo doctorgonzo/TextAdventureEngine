@@ -2,7 +2,10 @@
     "name": "TextEngine.Editor",
     "rootNamespace": "TextEngine.EditorTools",
     "references": [
-        "TextEngine.Runtime"
+        "TextEngine.Runtime",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [
         "Editor"
@@ -13,6 +16,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "TEXTENGINE_INPUTSYSTEM"
+        }
+    ],
     "noEngineReferences": false
 }

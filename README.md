@@ -70,7 +70,7 @@ A built-in example of an alternate game mode reachable from dialogue, played aga
 1. Install **Unity 6000.5.1f1** (or a compatible Unity 6 release).
 2. Clone the repo and open the project folder in Unity. (Unity-generated folders — `Library/`, `Temp/`, `Logs/`, builds — are excluded from version control and regenerate on first open.)
 3. Open the main scene under `Assets/Scenes/` and press **Play**.
-4. To build your own game: create content assets in a `Resources/` folder (see the authoring table below), wire rooms together in the **World Map Graph Editor**, and set the starting locations on the `GameController` in the scene.
+4. To build your own game: run **`Tools ▸ Text Engine ▸ Create Game Scene`** — it builds a complete, wired game scene (canvas, scrolling output, input field, EventSystem for whichever input backend is active, GameController, SoundManager) in one click. Then create content assets in a `Resources/` folder (see the authoring table below), wire rooms together in the **World Map Graph Editor**, and point the starting locations at your own rooms.
 
 ---
 
@@ -118,6 +118,7 @@ Inside a shop: `buy <item>`, `sell <item>`, `leave`. With a trainer: `buy <skill
 One `EngineSettings` asset, assigned to the `GameController`, controls:
 
 - **Feature toggles** — leveling system, primary attributes, drunkenness, status effects. Systems that are off cost nothing and hide their output.
+- **Content root folder** — where the editor tools create new content assets, so your game's content lives in its own `Resources/` folder, cleanly separated from the demo's.
 - **Simple-stats balance** — flat max health / attack / hit / dodge used when primary attributes are off.
 - **Attribute-derived balance** — base values and per-point multipliers for health (stamina), mana (intellect), attack (strength), hit/dodge (agility), plus caps.
 - **Leveling balance** — XP curve multiplier, attribute and skill points granted per level.
@@ -126,6 +127,8 @@ One `EngineSettings` asset, assigned to the `GameController`, controls:
 
 ## Editor tools
 
+- **Create Game Scene** (`Tools ▸ Text Engine ▸ Create Game Scene`) — one-click scene setup: builds and wires the full UI + engine rig so a fresh project is playable immediately.
+- **Content Validator** (`Tools ▸ Text Engine ▸ Validate Content`) — one-click audit of every content asset: broken exit destinations, locked doors without keys, dialogue actions missing their item/quest, out-of-range quest objectives, flags missing from the registry, assets outside `Resources/` (invisible to the engine), and duplicate asset names (which collide in the name-keyed save system). Results are ranked by severity with click-to-ping.
 - **World Map Graph Editor** (`Window ▸ World Map Graph Editor`) — a visual node graph of every location. Drag from a room's compass port into another room's *Entrance* to create an exit; the reciprocal exit is auto-created but independently deletable (so one-way passages are easy). Right-drag to pan, `Ctrl+A` to auto-arrange, toolbar buttons to create locations.
 - **Flag Inspector** (`Window ▸ Flag Inspector`) — view and toggle all world flags at runtime for testing.
 - **Scenario Loader** (`Window ▸ Scenario Loader`) — jump the running game to a defined starting scenario.
@@ -152,6 +155,8 @@ Combat, dialogue, and the minigame are partials (rather than standalone classes)
 All runtime code lives in the **`TextEngine`** namespace and editor tooling in **`TextEngine.EditorTools`**, compiled into separate `TextEngine.Runtime` / `TextEngine.Editor` assemblies via asmdefs — so the engine imports cleanly into existing projects without class-name collisions.
 
 An **EditMode test suite** (`TextEngine.Tests`, visible in `Window ▸ General ▸ Test Runner`) covers the Connect Four AI, the noun matcher, the content catalogs (including a duplicate-asset-name check, since saves are name-keyed), and save-file round-tripping. Save files carry a **format version** for forward migration, and the `GameController` validates its scene wiring on startup with actionable `[Text Engine]` errors instead of exceptions.
+
+The engine works under **either input backend** — the legacy Input Manager or the Input System package — detected automatically at compile time, and the scene creator picks the matching UI input module.
 
 Two small wrapper classes keep runtime state off the shared assets: **`EnemyInstance`** (blueprint + current health) and **`ItemInstance`** (blueprint reference; the hook for future per-copy state like durability or charges). Rooms, shops, the inventory, and equipment slots all hold instances — ScriptableObject assets are never mutated at runtime.
 

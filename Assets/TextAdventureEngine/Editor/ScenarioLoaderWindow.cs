@@ -77,7 +77,7 @@ namespace TextEngine.EditorTools
         /// </summary>
         private void LoadSelectedScenario()
         {
-            var controller = Object.FindFirstObjectByType<GameController>();
+            var controller = Object.FindAnyObjectByType<GameController>();
             if (controller == null)
             {
                 Debug.LogError("[Text Engine] No GameController found in the scene.");

@@ -56,7 +56,6 @@ namespace TextEngine.EditorTools
         private void HandleExitsList()
         {
             const string propertyName = "exits";
-            const string label = "Exits";
 
             SerializedProperty listProperty = serializedObject.FindProperty(propertyName);
 
