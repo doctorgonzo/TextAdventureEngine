@@ -128,16 +128,16 @@ namespace TextEngine
 
         [Header("Game Events")]
         [Tooltip("Fired when the player successfully takes an item.")]
-        public ItemEvent onItemTaken;
+        public ItemEvent onItemTaken = new ItemEvent();
 
         [Tooltip("Fired when the player successfully drops an item.")]
-        public ItemEvent onItemDropped;
+        public ItemEvent onItemDropped = new ItemEvent();
 
         [Tooltip("Fired when the player moves to a new location.")]
-        public LocationEvent onLocationChanged;
+        public LocationEvent onLocationChanged = new LocationEvent();
 
         [Tooltip("Fired when a combat encounter with an enemy is over.")]
-        public EnemyInstanceEvent onEnemyDefeated;
+        public EnemyInstanceEvent onEnemyDefeated = new EnemyInstanceEvent();
         #endregion
 
         #region Unity Lifecycle Methods
