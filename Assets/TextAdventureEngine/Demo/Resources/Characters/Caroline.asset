@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1cd6dc50d7727fb4b8592e4a9f19522f, type: 3}
-  m_Name: Holden
-  m_EditorClassIdentifier: 
-  characterName: Holden
-  descriptionInRoom: A disheveled-looking Holden stands here.
-  detailedDescription: 
-  startingDialogue: {fileID: 11400000, guid: 35c54256a50c7884f996a388d1fdf5cf, type: 2}
+  m_Name: Caroline
+  m_EditorClassIdentifier: TextEngine.Runtime::TextEngine.Character
+  characterName: Caroline
+  descriptionInRoom: A well-medicated Caroline stands here.
+  detailedDescription: A gnome of a woman with a mean uppercut.
+  startingDialogue: {fileID: 0}
   becomesEnemy: {fileID: 0}
   skillsToTeach: []
-  connectFourDifficulty: 2
+  connectFourDifficulty: 1

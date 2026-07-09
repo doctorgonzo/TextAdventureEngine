@@ -3,7 +3,7 @@ namespace TextEngine
     using UnityEngine;
     using System.Collections.Generic;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Custom Action")]
+    [CreateAssetMenu(menuName = "Text Adventure/Custom Action", order = 2)]
     public class CustomAction : ScriptableObject
     {
         [Tooltip("The main verb for this action (e.g., 'read', 'climb').")]

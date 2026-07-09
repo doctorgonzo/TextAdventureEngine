@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   description: Congratulations! You have completed the tutorial and can use this
     scene as a guide to many of the engine's features. The rest is explained in the
-    docuementation. Make sure you read at least the quickstart guide before going
+    documentation. Make sure you read at least the quickstart guide before going
     any further. Have fun!
   exits: []
   itemsInLocation: []

@@ -3,7 +3,7 @@ namespace TextEngine
     using UnityEngine;
     using System.Collections.Generic; 
 
-    [CreateAssetMenu(menuName = "Text Adventure/Action")]
+    [CreateAssetMenu(menuName = "Text Adventure/Action", order = 0)]
     public class Action : ScriptableObject
     {
         public string keyword; // The main verb we'll use in our code (e.g., "go")

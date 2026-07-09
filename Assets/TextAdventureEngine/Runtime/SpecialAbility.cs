@@ -2,7 +2,7 @@ namespace TextEngine
 {
     using UnityEngine;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Special Ability")]
+    [CreateAssetMenu(menuName = "Text Adventure/Special Ability", order = 14)]
     public class SpecialAbility : ScriptableObject
     {
         [Range(0, 1)] // Restricts the value to a 0-1 range in the Inspector

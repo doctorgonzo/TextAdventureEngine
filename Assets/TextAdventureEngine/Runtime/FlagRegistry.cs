@@ -3,7 +3,7 @@ namespace TextEngine
     using UnityEngine;
     using System.Collections.Generic;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Flag Registry")]
+    [CreateAssetMenu(menuName = "Text Adventure/Flag Registry", order = 7)]
     public class FlagRegistry : ScriptableObject
     {
         [Tooltip("Define every possible flag name in your game here. This list will populate the dropdowns in other assets.")]

@@ -47,24 +47,38 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 06c9632de27105c4aa4c7f15b0c4993f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  EditorConsoleLog: []
-  playerMaxHealth: 100
-  playerBaseAttack: 5
+  playerStats:
+    strength: 1
+    agility: 2
+    stamina: 2
+    intellect: 2
+    maxHealth: 100
+    baseAttack: 5
+    dodgeChance: 0.06
+    hitChance: 0
+    currentMana: 0
+    maxMana: 0
+    level: 1
+    currentXp: 0
+    xpToNextLevel: 100
+    skillPoints: 0
+    currency: 0
   playerDamageVariance: 3
   drunkennessSoberRate: 0.05
-  playerLevel: 1
-  playerCurrentXp: 0
-  xpToNextLevel: 100
-  skillPoints: 0
-  introText: "You wake up on the floor of a filthy apartment bedroom. Dirty clothes,
-    crusty dishes, and piles of trash greet you as you slowly open your eyes. \n\n"
+  introText: 'This is the Intro Text. It is set on your GameController GameObject
+    in the Unity Editor. Look below where this text is entered for a bunch of important
+    settings. See the included documentation for more info.
+
+
+'
   displayText: {fileID: 0}
   inputField: {fileID: 0}
   nameCharacterLimit: 25
   charactersPerSecond: 50
   scrollRect: {fileID: 0}
-  bypassTutorial: 1
-  tutorialStartLocation: {fileID: 11400000, guid: 360f3991b23842b46938998e2592ef75, type: 2}
+  bypassTutorial: 0
+  engineSettings: {fileID: 11400000, guid: 28e33f162a7f5fc49a2bc0fbc8aaa99f, type: 2}
+  tutorialStartLocation: {fileID: 11400000, guid: 505fdec25d251494fa7599c784159e5b, type: 2}
   mainGameStartLocation: {fileID: 11400000, guid: af805602f52317e4a8f642d20d7a7c0f, type: 2}
   completedQuests: []
   onItemTaken:

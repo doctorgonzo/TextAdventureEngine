@@ -19,7 +19,7 @@ namespace TextEngine
         public List<InteractionEffect> effects = new List<InteractionEffect>();
     }
 
-    [CreateAssetMenu(menuName = "Text Adventure/Interactable")]
+    [CreateAssetMenu(menuName = "Text Adventure/Interactable", order = 8)]
     public class Interactable : ScriptableObject
     {
         public string noun;
