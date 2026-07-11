@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f5ea411ae8e0b3a4bb96f93b2377eca1, type: 3}
-  m_Name: Seventh Room
-  m_EditorClassIdentifier: 
-  description: Welcome to room seven! Try talking to Cletus, it's fun!
+  m_Name: FirstRoom
+  m_EditorClassIdentifier: TextEngine.Runtime::TextEngine.Location
+  description: Welcome to Text Adventure! Type ? or help for a list of commands.
   exits:
-  - direction: south
-    destination: {fileID: 11400000, guid: f98a99f5e50717140b6d549f41e17af3, type: 2}
+  - direction: 
+    destination: {fileID: 11400000, guid: 5d05741e79d1f474ebfda075227c41b7, type: 2}
     isLocked: 0
     keyToUnlock: {fileID: 0}
     lockedDescription: 
@@ -27,25 +27,11 @@ MonoBehaviour:
     targetLocation: {fileID: 0}
     itemsToReveal: []
     stateChangeMessage: 
-  - direction: west
-    destination: {fileID: 11400000, guid: 11d24f22432417647ac01244dce07c90, type: 2}
-    isLocked: 0
-    keyToUnlock: {fileID: 0}
-    lockedDescription: 
-    isHidden: 1
-    exitAction: 0
-    deathMessage: 
-    blockingItem: {fileID: 0}
-    blockedMessage: 
-    targetLocation: {fileID: 0}
-    itemsToReveal: []
-    stateChangeMessage: 
   itemsInLocation: []
   interactables: []
-  charactersInLocation:
-  - {fileID: 11400000, guid: 991bdf96a30cd7149a123bd65e1d7095, type: 2}
+  charactersInLocation: []
   backgroundMusic: {fileID: 0}
   defaultEnemies: []
   isShop: 0
   shopInventory: []
-  editorPosition: {x: 500, y: 200}
+  editorPosition: {x: 0, y: 0}

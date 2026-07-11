@@ -3,7 +3,7 @@ namespace TextEngine
     using UnityEngine;
     using System.Collections.Generic;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Scenario", order = 12)]
+    [CreateAssetMenu(menuName = "Text Adventure/Scenario", order = 13)]
     public class TextEngineScenario : ScriptableObject
     {
         [Tooltip("Display name for the scenario")] public string scenarioName;

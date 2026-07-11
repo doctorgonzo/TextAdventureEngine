@@ -158,10 +158,7 @@ namespace TextEngine
                     case DialogueActionType.BecomeHostile:
                         if (activeConversationCharacter != null && activeConversationCharacter.becomesEnemy != null)
                         {
-                            roomCharactersState[currentLocation].Remove(activeConversationCharacter);
-                            // The rest of the logic is the same...
-                            EnemyInstance newEnemy = new EnemyInstance(activeConversationCharacter.becomesEnemy);
-                            roomEnemiesState[currentLocation].Add(newEnemy);
+                            ConvertCharacterToEnemy(activeConversationCharacter);
                             EndDialogue();
                         }
                         break;

@@ -3,7 +3,7 @@ namespace TextEngine
     using UnityEngine;
     using System.Collections.Generic;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Quest", order = 11)]
+    [CreateAssetMenu(menuName = "Text Adventure/Quest", order = 12)]
     public class Quest : ScriptableObject
     {
         public string questName;

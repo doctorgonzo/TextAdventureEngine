@@ -3,7 +3,7 @@ namespace TextEngine
     using UnityEngine;
     using System.Collections.Generic;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Dialogue Node", order = 3)]
+    [CreateAssetMenu(menuName = "Text Adventure/Dialogue Node", order = 4)]
     public class DialogueNode : ScriptableObject
     {
         [TextArea(5, 10)]

@@ -2,7 +2,7 @@ namespace TextEngine
 {
     using UnityEngine;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Item", order = 9)]
+    [CreateAssetMenu(menuName = "Text Adventure/Item", order = 10)]
     public class Item : ScriptableObject
     {
         public string itemName;

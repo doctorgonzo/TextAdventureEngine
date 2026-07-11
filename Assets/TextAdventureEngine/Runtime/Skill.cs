@@ -18,7 +18,7 @@ namespace TextEngine
         // You can add more passive effects here later
     }
 
-    [CreateAssetMenu(menuName = "Text Adventure/Skill", order = 13)]
+    [CreateAssetMenu(menuName = "Text Adventure/Skill", order = 14)]
     public class Skill : ScriptableObject
     {
         public string skillName;

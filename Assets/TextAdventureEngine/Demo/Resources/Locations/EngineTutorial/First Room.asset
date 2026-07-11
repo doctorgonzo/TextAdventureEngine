@@ -36,4 +36,4 @@ MonoBehaviour:
   defaultEnemies: []
   isShop: 0
   shopInventory: []
-  editorPosition: {x: 250, y: 400}
+  editorPosition: {x: 500, y: 0}

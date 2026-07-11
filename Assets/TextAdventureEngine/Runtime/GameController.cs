@@ -17,7 +17,11 @@ namespace TextEngine
     {
         public Enemy enemyBlueprint; // The ScriptableObject template
         public int currentHealth;
-        public float autoAttackTimer;
+        // Whether this enemy has noticed the player as a threat. Normal enemies
+        // start aware; an NPC provoked into combat starts unaware so opener
+        // attacks (CombatAction.onlyIfEnemyUnaware) can land their bonus. Any
+        // strike flips it to true. Not persisted to saves — enemies load aware.
+        public bool awareOfPlayer = true;
 
         public EnemyInstance(Enemy blueprint)
         {
@@ -104,8 +108,12 @@ namespace TextEngine
         private Item[] allItems => world.allItems;
         private Character activeTrainer;
         private CustomAction[] allCustomActions;
+        private CombatAction[] allCombatActions;
         private TextRenderer textRenderer;
         private SaveSystem saveSystem;
+        // Found in Awake; PlaySound effects degrade to silence without one.
+        private SoundManager soundManager;
+        private bool warnedMissingSoundManager;
         // Built-in verb keyword -> handler, built once in Awake. Each handler
         // receives the (article-stripped, lowercased) noun phrase after the verb.
         private Dictionary<string, System.Action<string>> verbHandlers;
@@ -173,17 +181,21 @@ namespace TextEngine
             textRenderer = new TextRenderer(this, displayText, inputField, scrollRect,
                 charactersPerSecond, ProcessPlayerName, playerInputColor, gameResponseColor);
             saveSystem = new SaveSystem();
+            // PlaySound effects route through the scene's SoundManager (Create
+            // Game Scene wires one up automatically).
+            soundManager = FindFirstObjectByType<SoundManager>();
             // WorldState loads its own location/enemy/item catalogs from Resources.
             world = new WorldState();
             // Actions and skills are used by the parser/skill systems, not the
             // world model, so GameController still owns those catalogs.
             allActions = Resources.LoadAll<Action>("Actions");
             allCustomActions = Resources.LoadAll<CustomAction>("Actions/Custom");
+            allCombatActions = Resources.LoadAll<CombatAction>("Actions/Combat");
             allSkills = Resources.LoadAll<Skill>("Skills");
             BuildVerbHandlers();
             if (engineSettings.verboseLogging)
             {
-                Debug.Log($"[Text Engine] Loaded {allActions.Length} actions, {allCustomActions.Length} custom actions, {allSkills.Length} skills, and {allLocations.Length} locations.");
+                Debug.Log($"[Text Engine] Loaded {allActions.Length} actions, {allCustomActions.Length} custom actions, {allCombatActions.Length} combat actions, {allSkills.Length} skills, and {allLocations.Length} locations.");
             }
         }
 
@@ -544,13 +556,26 @@ namespace TextEngine
             string verb = words[0];
             // Resolve the typed verb (or a synonym) to an Action asset's keyword.
             string actionKeyword = null;
-            foreach (Action action in allActions) { if (action.keyword.ToLower() == verb || action.synonyms.Contains(verb)) { actionKeyword = action.keyword.ToLower(); break; } }
+            // Synonyms are lowercased like keywords, so an authored "Smash" still
+            // matches — CustomAction and CombatAction matching does the same.
+            foreach (Action action in allActions) { if (action.keyword.ToLower() == verb || action.synonyms.Any(s => s.ToLower() == verb)) { actionKeyword = action.keyword.ToLower(); break; } }
             // Build the noun phrase, dropping articles so "take the lantern" works.
             string nounPhrase = string.Join(" ", words.Skip(1)
                 .Where(w => w != "a" && w != "an" && w != "the" && w.Length > 0));
             if (actionKeyword != null && verbHandlers.TryGetValue(actionKeyword, out var handler))
             {
                 handler(nounPhrase);
+                return;
+            }
+            // Data-driven combat verbs (backstab, power attack, etc.). Checked
+            // before CustomActions since these run their own combat resolution.
+            string combatKeyword = actionKeyword ?? verb;
+            var combatAction = allCombatActions.FirstOrDefault(a =>
+                a.keyword.ToLower() == combatKeyword ||
+                a.synonyms.Any(s => s.ToLower() == verb));
+            if (combatAction != null)
+            {
+                HandleCombatAction(combatAction, nounPhrase);
                 return;
             }
             // Not a built-in verb: check the data-driven CustomAction assets.
@@ -775,8 +800,7 @@ namespace TextEngine
                             LogText($"The {target.noun} is destroyed.", TextType.GameResponse);
                             break;
                         case ActionEffectType.PlaySound:
-                            // This assumes you have a reference to a SoundManager instance.
-                            // soundManager.sfxSource.PlayOneShot(effect.audioClipParameter);
+                            PlayEffectSound(effect.audioClipParameter);
                             break;
                     }
                 }
@@ -798,6 +822,11 @@ namespace TextEngine
             }
             // Custom verbs are commands too.
             foreach (CustomAction action in allCustomActions)
+            {
+                helpText.Append("\n- " + action.keyword);
+            }
+            // As are data-driven combat verbs.
+            foreach (CombatAction action in allCombatActions)
             {
                 helpText.Append("\n- " + action.keyword);
             }
@@ -1562,7 +1591,7 @@ namespace TextEngine
                         }
                         break;
                     case InteractionEffectType.PlaySound:
-                        // soundManager.PlayOneShot(effect.audioClipParameter);
+                        PlayEffectSound(effect.audioClipParameter);
                         break;
                     // --- ADD THIS NEW CASE ---
                     case InteractionEffectType.ConsumeUsedItem:
@@ -1576,6 +1605,23 @@ namespace TextEngine
             }
             // Refresh the room description to reflect any changes.
             DisplayLocation(useTypewriter: false);
+        }
+
+        // Plays a one-off clip for a PlaySound effect. A missing SoundManager is
+        // an authoring/setup problem, not a crash — warn once, then stay silent.
+        private void PlayEffectSound(AudioClip clip)
+        {
+            if (clip == null) return;
+            if (soundManager == null || soundManager.sfxSource == null)
+            {
+                if (!warnedMissingSoundManager)
+                {
+                    Debug.LogWarning("[Text Engine] A PlaySound effect fired, but the scene has no SoundManager with an SFX source. Add one, or rebuild the scene via Tools ▸ Text Engine ▸ Create Game Scene.", this);
+                    warnedMissingSoundManager = true;
+                }
+                return;
+            }
+            soundManager.sfxSource.PlayOneShot(clip);
         }
 
         private void HandleQuests()

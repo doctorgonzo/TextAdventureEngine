@@ -12,7 +12,7 @@ namespace TextEngine
         DecreaseDefense
     }
 
-    [CreateAssetMenu(menuName = "Text Adventure/Status Effect", order = 15)]
+    [CreateAssetMenu(menuName = "Text Adventure/Status Effect", order = 16)]
     public class StatusEffect : ScriptableObject
     {
         public string effectName;

@@ -112,7 +112,9 @@ namespace TextEngine
                 string enemyName = targetEnemy.enemyBlueprint.enemyName;
                 LogText($"You attack the {enemyName}!");
                 int totalPlayerBaseAttack = Mathf.Max(0, playerStats.baseAttack + GetAttackBonusFromEffects());
-                int playerDamageDealt = Random.Range(totalPlayerBaseAttack - playerDamageVariance, totalPlayerBaseAttack + playerDamageVariance + 1);
+                // Clamp the roll: with a low attack stat the variance range can
+                // dip below zero, and negative damage would heal the enemy.
+                int playerDamageDealt = Mathf.Max(0, Random.Range(totalPlayerBaseAttack - playerDamageVariance, totalPlayerBaseAttack + playerDamageVariance + 1));
                 targetEnemy.currentHealth -= playerDamageDealt;
                 LogText($"You deal {playerDamageDealt} damage. The {enemyName} has {targetEnemy.currentHealth} health remaining.");
             }
@@ -128,6 +130,116 @@ namespace TextEngine
             // (Status effects tick in real time from Update(), so no extra
             // per-exchange processing is needed here.)
             EnemyAttackTurn(targetEnemy);
+        }
+
+        // Data-driven attack variant. The numbers and targeting rules come from a
+        // CombatAction asset, so designers can author backstabs, power attacks,
+        // and provoking strikes without new code. Deliberately kept separate from
+        // HandleAttack so the built-in attack verb is never affected.
+        void HandleCombatAction(CombatAction action, string nounPhrase)
+        {
+            bool ambiguous;
+
+            if (string.IsNullOrEmpty(nounPhrase))
+            {
+                LogText(action.failureMessage);
+                return;
+            }
+
+            // --- Stun check (mirrors HandleAttack) ---
+            if (isPlayerStunned)
+            {
+                LogText("You are stunned and cannot act!", TextType.GameResponse);
+                isPlayerStunned = false;
+                var stunnedTarget = FindByNoun(roomEnemiesState[currentLocation], e => e.enemyBlueprint.enemyName, nounPhrase, out ambiguous);
+                if (stunnedTarget != null) EnemyAttackTurn(stunnedTarget);
+                return;
+            }
+
+            // --- Resolve the target ---
+            // Prefer an already-hostile enemy; otherwise try to provoke an NPC.
+            var targetEnemy = FindByNoun(roomEnemiesState[currentLocation], e => e.enemyBlueprint.enemyName, nounPhrase, out ambiguous);
+            if (ambiguous) return;
+
+            if (targetEnemy == null)
+            {
+                var targetCharacter = FindByNoun(roomCharactersState[currentLocation], c => c.characterName, nounPhrase, out ambiguous);
+                if (ambiguous) return;
+
+                if (targetCharacter != null)
+                {
+                    if (!action.provokesNPCs)
+                    {
+                        LogText(action.failureMessage);
+                        return;
+                    }
+                    if (targetCharacter.becomesEnemy == null)
+                    {
+                        LogText($"The {targetCharacter.characterName} can't be turned hostile.");
+                        return;
+                    }
+                    // Convert the NPC into a fresh, unaware enemy and target it.
+                    targetEnemy = ConvertCharacterToEnemy(targetCharacter);
+                }
+                else
+                {
+                    LogText("There is no " + nounPhrase + " here to attack.");
+                    return;
+                }
+            }
+
+            // --- Stealth gate: unaware-only strikes refuse an alert enemy ---
+            if (action.onlyIfEnemyUnaware && targetEnemy.awareOfPlayer)
+            {
+                LogText(action.failureMessage);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(action.flavorMessage))
+                LogText(action.flavorMessage, TextType.GameResponse);
+
+            string enemyName = targetEnemy.enemyBlueprint.enemyName;
+
+            // --- Hit roll ---
+            float finalHitChance = playerStats.hitChance + action.hitChanceModifier - targetEnemy.enemyBlueprint.evasionChance;
+            if (Random.value > finalHitChance)
+            {
+                LogText($"You swing at the {enemyName} but miss!");
+            }
+            else
+            {
+                int totalBase = Mathf.Max(0, playerStats.baseAttack + GetAttackBonusFromEffects());
+                int scaled = Mathf.RoundToInt(totalBase * action.damageMultiplier) + action.bonusDamage;
+                int damage = Mathf.Max(0, Random.Range(scaled - playerDamageVariance, scaled + playerDamageVariance + 1));
+                targetEnemy.currentHealth -= damage;
+                LogText($"You {action.keyword} the {enemyName} for {damage} damage. The {enemyName} has {targetEnemy.currentHealth} health remaining.");
+            }
+
+            // The target now knows you're a threat, so future unaware-only strikes fail.
+            targetEnemy.awareOfPlayer = true;
+
+            // --- Defeat / retaliation ---
+            if (targetEnemy.currentHealth <= 0)
+            {
+                ResolveEnemyDefeat(targetEnemy);
+                return;
+            }
+            if (action.enemyRetaliates)
+            {
+                EnemyAttackTurn(targetEnemy);
+            }
+        }
+
+        // Swaps a friendly Character out of the current room for a hostile
+        // EnemyInstance built from its 'becomesEnemy' blueprint, and returns it.
+        // The new enemy starts unaware so opener attacks can land their bonus.
+        // Shared by the data-driven combat actions and the dialogue BecomeHostile path.
+        private EnemyInstance ConvertCharacterToEnemy(Character character)
+        {
+            roomCharactersState[currentLocation].Remove(character);
+            var newEnemy = new EnemyInstance(character.becomesEnemy) { awareOfPlayer = false };
+            roomEnemiesState[currentLocation].Add(newEnemy);
+            return newEnemy;
         }
 
         private void HandleCast(string nounPhrase)
@@ -245,15 +357,6 @@ namespace TextEngine
                         playerCurrentHealth = Mathf.Min(playerStats.maxHealth, playerCurrentHealth + effect.intParameter);
                         LogText($"You restore {effect.intParameter} health.", TextType.GameResponse);
                         break;
-                    case ActiveSkillEffectType.ApplyStatusEffectToTarget:
-                        if (target != null && effect.statusEffectParameter != null)
-                        {
-                            // This logic can be simplified by creating a helper function
-                            // to apply status effects to a target (player or enemy).
-                            // For now, we'll just log it.
-                            LogText($"You apply {effect.statusEffectParameter.effectName} to the {target.enemyBlueprint.enemyName}.", TextType.GameResponse);
-                        }
-                        break;
                     case ActiveSkillEffectType.ApplyStatusEffectToSelf:
                         if (effect.statusEffectParameter != null)
                         {
@@ -333,10 +436,21 @@ namespace TextEngine
             // This logic can be expanded from your old HandleAttack function.
             switch (ability.effect)
             {
+                case AbilityEffect.SkipTurn:
+                    // The successDescription logged above IS the effect — the
+                    // enemy deliberately does nothing this turn.
+                    break;
                 case AbilityEffect.SelfHeal:
                     attacker.currentHealth += ability.magnitude;
                     attacker.currentHealth = Mathf.Min(attacker.currentHealth, attacker.enemyBlueprint.maxHealth);
                     LogText($"{attacker.enemyBlueprint.enemyName} heals for {ability.magnitude} health!", TextType.GameResponse);
+                    break;
+                case AbilityEffect.LifeDrain:
+                    int drained = Mathf.Max(0, ability.magnitude);
+                    playerCurrentHealth -= drained;
+                    attacker.currentHealth = Mathf.Min(attacker.currentHealth + drained, attacker.enemyBlueprint.maxHealth);
+                    LogText($"The {attacker.enemyBlueprint.enemyName} drains {drained} health from you! You have {playerCurrentHealth}/{playerStats.maxHealth} health remaining.", TextType.GameResponse);
+                    CheckPlayerDefeated();
                     break;
                 case AbilityEffect.StunPlayer:
                     isPlayerStunned = true;
@@ -345,19 +459,10 @@ namespace TextEngine
                     playerStats.currentMana = Mathf.Max(0, playerStats.currentMana - ability.magnitude);
                     LogText($"Your mind feels hazy. The {attacker.enemyBlueprint.enemyName} drains {ability.magnitude} mana!", TextType.GameResponse);
                     break;
-                case AbilityEffect.CleanseDebuffs:
-                    // This is a placeholder for logic that would remove negative effects from the enemy.
-                    LogText($"The {attacker.enemyBlueprint.enemyName} purges its negative effects!", TextType.GameResponse);
-                    break;
                 case AbilityEffect.ApplyDebuffToPlayer:
                     // The linked status effect is applied by the shared
                     // effectToApplyOnSuccess block below (applying it here as well
                     // used to stack the debuff twice per use).
-                    break;
-                case AbilityEffect.ApplyBuffToSelf:
-                    // This applies the linked status effect to the enemy itself.
-                    // This requires a similar status effect system for enemies.
-                    LogText($"The {attacker.enemyBlueprint.enemyName} empowers itself!", TextType.GameResponse);
                     break;
             }
             // Apply any secondary status effects.
@@ -380,12 +485,18 @@ namespace TextEngine
             int damageTaken = Mathf.Max(0, enemyDamageDealt - finalPlayerDefense);
             playerCurrentHealth -= damageTaken;
             LogText($"The {attacker.enemyBlueprint.enemyName} deals {damageTaken} damage. You have {playerCurrentHealth}/{playerStats.maxHealth} health remaining.");
-            if (playerCurrentHealth <= 0)
-            {
-                LogText("You have been defeated... Your vision fades to black.");
-                LogText("<color=red>G A M E   O V E R</color>", TextType.Narrative);
-                currentGameState = GameState.GameOver;
-            }
+            CheckPlayerDefeated();
+        }
+
+        // Shared death check for anything that damages the player mid-combat
+        // (standard attacks, LifeDrain). DoT effects keep their own flavor text
+        // in ApplyTimedEffect.
+        private void CheckPlayerDefeated()
+        {
+            if (playerCurrentHealth > 0) return;
+            LogText("You have been defeated... Your vision fades to black.");
+            LogText("<color=red>G A M E   O V E R</color>", TextType.Narrative);
+            currentGameState = GameState.GameOver;
         }
 
         private void CheckForAmbushes()

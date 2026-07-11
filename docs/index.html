@@ -244,7 +244,7 @@
         <li><b>Natural input</b> — articles (<code>a</code>, <code>an</code>, <code>the</code>) are ignored: <code>take the lantern</code> just works.</li>
         <li><b>Partial matching</b> — exact → prefix → substring, so <code>attack gob</code> hits the goblin; ambiguity prompts <i>"Which do you mean: X, Y?"</i></li>
         <li><b>Direction shortcuts</b> — <code>go n</code>/<code>s</code>/<code>e</code>/<code>w</code>/<code>u</code>/<code>d</code>.</li>
-        <li><b>Data-driven verbs</b> — every verb is an asset with synonyms; brand-new verbs are self-contained <b>CustomAction</b> assets with their own effects. No code.</li>
+        <li><b>Data-driven verbs</b> — every verb is an asset with synonyms; brand-new verbs are self-contained <b>CustomAction</b> (world effects) or <b>CombatAction</b> (attacks) assets. No code.</li>
         <li><b>Command history</b> — up/down arrows recall previous commands.</li>
       </ul>
     </div>
@@ -262,8 +262,9 @@
       <ul>
         <li>Turn-based with <b>hit / dodge / evasion</b>, damage variance, and armor mitigation.</li>
         <li><b>Equipment matters</b> — weapons/armor grant flat attack and attribute bonuses, recalculated on equip.</li>
+        <li><b>Authorable attack verbs</b> — <b>CombatAction</b> assets: damage multipliers, accuracy modifiers, NPC provocation, stealth-only openers, hit-and-run strikes.</li>
         <li><b>Enemy AI</b> from behavior assets: prioritized actions gated by conditions ("health &lt; 30% → heal").</li>
-        <li><b>Special abilities</b> — heal, stun (blocks melee <i>and</i> casting), mana drain, cleanse, buffs/debuffs.</li>
+        <li><b>Special abilities</b> — heal, life drain, stun (blocks melee <i>and</i> casting), mana drain, taunts, debuffs.</li>
         <li><b>Status effects</b> tick in real time and survive saves. <b>Ambushes</b>, <b>loot</b>, <b>XP</b>.</li>
       </ul>
     </div>
@@ -289,6 +290,7 @@
         <li>Queued <b>typewriter</b> rendering, press-space-to-skip, auto-scroll.</li>
         <li>Color-coded output and automatic <b>keyword highlighting</b> of things in the room.</li>
         <li>Flavor systems like <b>drunkenness</b> — the on-screen text literally wobbles, then sobers off in real time.</li>
+        <li><b>Audio hooks</b> — per-location music, pickup sounds, and <code>PlaySound</code> effects on interactions and custom verbs.</li>
       </ul>
     </div>
   </div>
@@ -329,7 +331,7 @@
     <tr><th>Category</th><th>Commands</th></tr>
     <tr><td>Movement &amp; world</td><td><code>go &lt;dir&gt;</code> (or <code>n</code>/<code>s</code>/<code>e</code>/<code>w</code>/<code>u</code>/<code>d</code>), <code>look [at &lt;thing&gt;]</code>, <code>take &lt;item&gt;</code>, <code>drop &lt;item&gt;</code>, <code>use &lt;item&gt; [on &lt;target&gt;]</code>, <code>push</code> / <code>pull</code> / <code>flush</code> / <code>activate &lt;thing&gt;</code></td></tr>
     <tr><td>Character</td><td><code>inventory</code>, <code>equip</code> / <code>unequip &lt;item&gt;</code>, <code>equipment</code>, <code>status</code>, <code>char</code>, <code>skills [list]</code>, <code>learn &lt;skill&gt;</code>, <code>cast &lt;skill&gt; [on &lt;target&gt;]</code></td></tr>
-    <tr><td>Combat &amp; NPCs</td><td><code>attack &lt;enemy&gt;</code>, <code>talk to &lt;character&gt;</code></td></tr>
+    <tr><td>Combat &amp; NPCs</td><td><code>attack &lt;enemy&gt;</code>, any <b>CombatAction</b> verbs your game defines (e.g. <code>backstab &lt;enemy&gt;</code>), <code>talk to &lt;character&gt;</code></td></tr>
     <tr><td>Economy &amp; quests</td><td><code>balance</code>, <code>buy &lt;item&gt;</code>, <code>sell &lt;item&gt;</code>, <code>quests</code></td></tr>
     <tr><td>System</td><td><code>save</code>, <code>load</code>, <code>help</code></td></tr>
   </table></div>
@@ -345,7 +347,7 @@
     <tr><td>Item</td><td><code>Resources/Items/</code></td><td>Type, descriptions, equipment bonuses, consumable effects, status effect on use, prices, stacking</td></tr>
     <tr><td>Enemy</td><td><code>Resources/Enemies/</code></td><td>Stats, evasion, AI behavior, attacks-on-sight, loot, XP, exit revealed on death</td></tr>
     <tr><td>Enemy Behavior</td><td><code>Resources/Enemy Behaviors/</code></td><td>Prioritized AI actions gated by health-threshold conditions</td></tr>
-    <tr><td>Special Ability</td><td><code>Resources/Special Abilities/</code></td><td>Heal, stun, mana drain, cleanse, buff/debuff — magnitude + status payload</td></tr>
+    <tr><td>Special Ability</td><td><code>Resources/Special Abilities/</code></td><td>Skip turn, heal, life drain, stun, mana drain, debuff — magnitude + status payload</td></tr>
     <tr><td>Character</td><td><code>Resources/Characters/</code></td><td>Name, descriptions, starting dialogue, hostile form, skills taught, Connect Four skill</td></tr>
     <tr><td>Dialogue Node</td><td><code>Resources/Dialogue/</code></td><td>Text, responses → next nodes, required flags/items, failure node, success actions</td></tr>
     <tr><td>Quest</td><td><code>Resources/Quests/</code></td><td>Objectives and currency/item/XP rewards</td></tr>
@@ -354,6 +356,7 @@
     <tr><td>Interactable</td><td><code>Resources/Interactables/</code></td><td>Noun, descriptions, initial state, interactions (verb + state/item → effects), custom actions</td></tr>
     <tr><td>Action</td><td><code>Resources/Actions/</code></td><td>A built-in verb keyword and its synonyms</td></tr>
     <tr><td>Custom Action</td><td><code>Resources/Actions/Custom/</code></td><td>A brand-new verb: keyword, synonyms, failure message, effect list</td></tr>
+    <tr><td>Combat Action</td><td><code>Resources/Actions/Combat/</code></td><td>A brand-new attack verb: damage multiplier/bonus, accuracy modifier, NPC provocation, stealth-only targeting, retaliation toggle</td></tr>
     <tr><td>Scenario</td><td><code>Resources/Scenarios/</code></td><td>Test setup: starting location, inventory, enemies — loaded via Scenario Loader</td></tr>
     <tr><td>Flag Registry</td><td><code>Resources/</code></td><td>Master world-flag list feeding inspector dropdowns</td></tr>
     <tr><td>Engine Settings</td><td><code>Resources/</code></td><td>Feature toggles + balance numbers (below)</td></tr>
@@ -399,7 +402,7 @@
   </table></div>
   <p>Combat, dialogue, and the minigame are partials (rather than standalone classes) because they mutate a large amount of shared player state; splitting the files separates concerns without threading that state through an injected context.</p>
   <p>Two wrapper classes keep runtime state off the shared assets: <b><code>EnemyInstance</code></b> (blueprint + current health) and <b><code>ItemInstance</code></b> (blueprint reference; the hook for future per-copy state like durability). Rooms, shops, inventory, and equipment slots all hold instances — <b>ScriptableObject assets are never mutated at runtime</b>.</p>
-  <p>The parser resolves the typed verb through the <code>Action</code> catalog (keyword + synonyms), dispatches through a verb-handler table, and falls back to <code>CustomAction</code> assets — the entire verb surface is data-driven.</p>
+  <p>The parser resolves the typed verb through the <code>Action</code> catalog (keyword + synonyms), dispatches through a verb-handler table, and falls back to <code>CombatAction</code> then <code>CustomAction</code> assets — the entire verb surface is data-driven.</p>
   <p>All runtime code lives in the <b><code>TextEngine</code></b> namespace and editor tooling in <b><code>TextEngine.EditorTools</code></b>, compiled into separate asmdefs. An <b>EditMode test suite</b> covers the Connect Four AI, the noun matcher, catalog integrity (including duplicate-name detection — saves are name-keyed), and save round-tripping. Save files carry a <b>format version</b>, the <code>GameController</code> validates its scene wiring on startup with actionable <code>[Text Engine]</code> errors, and the engine works under <b>either input backend</b> (legacy Input Manager or the Input System package), detected at compile time.</p>
 </section>
 
@@ -409,7 +412,9 @@
 Assets/
 ├── <span class="dir">TextAdventureEngine/</span>
 │   ├── <span class="dir">Runtime/</span>          <span class="cm">Engine code (TextEngine namespace, TextEngine.Runtime asmdef)</span>
-│   ├── <span class="dir">Editor/</span>           <span class="cm">Custom inspectors + World Map / Flag / Scenario windows</span>
+│   ├── <span class="dir">Editor/</span>           <span class="cm">Custom inspectors + graph editors / validator / tool windows</span>
+│   ├── <span class="dir">Tests/</span>            <span class="cm">EditMode test suite (TextEngine.Tests asmdef)</span>
+│   ├── <span class="dir">Documentation/</span>    <span class="cm">Manual + store listing</span>
 │   └── <span class="dir">Demo/</span>
 │       ├── <span class="dir">Resources/</span>    <span class="cm">The demo game's content (see authoring table)</span>
 │       ├── <span class="dir">Scenes/</span>       <span class="cm">Demo scene + main menu</span>

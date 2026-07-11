@@ -3,7 +3,7 @@ namespace TextEngine
     using System.Collections.Generic;
     using UnityEngine;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Location", order = 10)]
+    [CreateAssetMenu(menuName = "Text Adventure/Location", order = 11)]
     public class Location : ScriptableObject
     {
         [TextArea(10, 15)]

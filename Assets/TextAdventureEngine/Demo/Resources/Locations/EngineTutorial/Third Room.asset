@@ -57,4 +57,4 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7fb07a4a27be86d41bfeb466776d8881, type: 2}
   isShop: 0
   shopInventory: []
-  editorPosition: {x: 500, y: 200}
+  editorPosition: {x: 0, y: 400}

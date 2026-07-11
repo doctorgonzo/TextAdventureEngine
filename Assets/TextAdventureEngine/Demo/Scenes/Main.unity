@@ -405,6 +405,10 @@ PrefabInstance:
       propertyPath: displayText
       value: 
       objectReference: {fileID: 2010359132}
+    - target: {fileID: 8815591120111852378, guid: 47b4128b57404914bb2a84bbf7c56bd7, type: 3}
+      propertyPath: mainGameStartLocation
+      value: 
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

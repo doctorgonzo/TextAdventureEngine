@@ -2,7 +2,7 @@ namespace TextEngine
 {
     using UnityEngine;
 
-    [CreateAssetMenu(menuName = "Text Adventure/Engine Settings", fileName = "NewEngineSettings", order = 6)]
+    [CreateAssetMenu(menuName = "Text Adventure/Engine Settings", fileName = "NewEngineSettings", order = 7)]
     public class EngineSettings : ScriptableObject
     {
         [Header("Core Systems")]

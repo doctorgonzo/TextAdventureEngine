@@ -14,7 +14,7 @@ The player types natural commands (`go north`, `take the lantern`, `use key on d
 - **Natural input**: articles (`a`, `an`, `the`) are ignored, so `take the lantern` and `take lantern` both work.
 - **Partial matching**: noun lookups resolve exact → prefix → substring, so `attack gob` hits the goblin. When a partial name is ambiguous, the game asks *"Which do you mean: X, Y?"*.
 - **Direction shortcuts**: `go n` / `s` / `e` / `w` / `u` / `d` expand to the full compass directions.
-- **Data-driven verbs**: every built-in verb is an `Action` asset defining a keyword plus synonyms. New verbs are added as `CustomAction` assets — self-contained, with their own synonyms, failure message, and a list of effects (give/take items, set flags, change interactable state, heal/damage, teleport, destroy the target) — without touching code.
+- **Data-driven verbs**: every built-in verb is an `Action` asset defining a keyword plus synonyms. New verbs are added as assets — `CustomAction` for world interactions (give/take items, set flags, change interactable state, heal/damage, teleport, destroy the target, play a sound) and `CombatAction` for attack verbs — without touching code.
 - **Command history**: up/down arrows recall previous commands.
 
 ### World & exploration
@@ -26,8 +26,9 @@ The player types natural commands (`go north`, `take the lantern`, `use key on d
 ### Combat
 - Turn-based combat with **hit / dodge / evasion chance**, damage variance, and armor mitigation.
 - **Equipment matters**: weapons and armor contribute flat attack and attribute bonuses (strength/agility/stamina), recalculated on every equip/unequip.
+- **Authorable attack verbs**: `CombatAction` assets define new attacks (backstab, power attack, wild swing…) with a damage multiplier, flat bonus, and accuracy modifier — plus targeting rules: provoke a friendly NPC into its hostile form, restrict the attack to targets unaware of you (stealth openers), or skip the enemy's retaliation for hit-and-run strikes.
 - **Enemy AI** driven by `EnemyBehavior` assets: prioritized actions gated by conditions (e.g. "if my health < 30%, heal").
-- **Special abilities** — self-heal, stun (blocks both melee and spellcasting for a turn), mana drain, cleanse, and applying buffs/debuffs.
+- **Special abilities** — self-heal, life drain, stun (blocks both melee and spellcasting for a turn), mana drain, turn-skipping taunts, and applying debuffs to the player.
 - **Status effects** (damage/heal-over-time, attack/defense buffs and debuffs) that tick in real time and persist through saves.
 - **Ambushes** from enemies that attack on sight (on every kind of exit), **loot drops**, and **XP rewards** on defeat.
 
@@ -46,6 +47,7 @@ The player types natural commands (`go north`, `take the lantern`, `use key on d
 - Typewriter text rendering with a queue, **press-space-to-skip**, and auto-scroll.
 - Color-coded output (player input, game responses, keywords, enemies) and automatic **keyword highlighting** of things in the current room.
 - Optional flavor systems, e.g. a **drunkenness** system that literally makes the on-screen text wobble and sobers off in real time.
+- **Audio hooks** — per-location background music, item pickup sounds, and `PlaySound` effects on interactions and custom verbs, all routed through a scene `SoundManager`.
 
 ### Save / load
 Full game state serialized to JSON in Unity's persistent data path:
@@ -82,7 +84,7 @@ A built-in example of an alternate game mode reachable from dialogue, played aga
 |---|---|
 | Movement & world | `go <dir>` (or `n`/`s`/`e`/`w`/`u`/`d`), `look [at <thing>]`, `take <item>`, `drop <item>`, `use <item> [on <target>]`, `push` / `pull` / `flush` / `activate <thing>` |
 | Character | `inventory`, `equip` / `unequip <item>`, `equipment`, `status`, `char`, `skills [list]`, `learn <skill>`, `cast <skill> [on <target>]` |
-| Combat & NPCs | `attack <enemy>`, `talk to <character>` |
+| Combat & NPCs | `attack <enemy>`, any `CombatAction` verbs your game defines (e.g. `backstab <enemy>`), `talk to <character>` |
 | Economy & quests | `balance`, `buy <item>`, `sell <item>`, `quests` |
 | System | `save`, `load`, `help` |
 
@@ -100,7 +102,7 @@ Inside a shop: `buy <item>`, `sell <item>`, `leave`. With a trainer: `buy <skill
 | **Item** | `Resources/Items/` | Type, descriptions, equipment bonuses (attack/defense/attributes), consumable effects, status effect on use, prices, stacking rules |
 | **Enemy** | `Resources/Enemies/` | Stats, evasion, AI behavior, attacks-on-sight, loot, XP, exit revealed on death |
 | **Enemy Behavior** | `Resources/Enemy Behaviors/` | Prioritized list of AI actions, each gated by conditions (own/player health thresholds) |
-| **Special Ability** | `Resources/Special Abilities/` | Enemy ability: heal, stun, mana drain, cleanse, buff/debuff, with magnitude and status effect payload |
+| **Special Ability** | `Resources/Special Abilities/` | Enemy ability: skip turn, heal, life drain, stun, mana drain, debuff, with magnitude and status effect payload |
 | **Character** | `Resources/Characters/` | Name, descriptions, starting dialogue node, hostile form (enemy), skills taught, Connect Four skill |
 | **Dialogue Node** | `Resources/Dialogue/` | Text, player responses (each linking to a next node), required flags/items, failure node, actions on success |
 | **Quest** | `Resources/Quests/` | Name, description, objectives, currency/item/XP rewards |
@@ -109,6 +111,7 @@ Inside a shop: `buy <item>`, `sell <item>`, `leave`. With a trainer: `buy <skill
 | **Interactable** | `Resources/Interactables/` | Noun, descriptions, initial state, interactions (verb + required state/item → effects), allowed custom actions |
 | **Action** | `Resources/Actions/` | A built-in verb keyword and its synonyms |
 | **Custom Action** | `Resources/Actions/Custom/` | A brand-new verb: keyword, synonyms, failure message, effect list |
+| **Combat Action** | `Resources/Actions/Combat/` | A brand-new attack verb: damage multiplier/bonus, accuracy modifier, NPC provocation, stealth-only targeting, retaliation toggle |
 | **Scenario** | `Resources/Scenarios/` | A test setup: starting location, inventory, enemies — jump there at runtime via the Scenario Loader |
 | **Flag Registry** | `Resources/` | The master list of world-flag names, used to populate dropdowns in custom inspectors |
 | **Engine Settings** | `Resources/` | The master feature toggles and balance numbers (below) |
@@ -163,7 +166,7 @@ The engine works under **either input backend** — the legacy Input Manager or 
 
 Two small wrapper classes keep runtime state off the shared assets: **`EnemyInstance`** (blueprint + current health) and **`ItemInstance`** (blueprint reference; the hook for future per-copy state like durability or charges). Rooms, shops, the inventory, and equipment slots all hold instances — ScriptableObject assets are never mutated at runtime.
 
-The parser resolves the typed verb through the `Action` catalog (keyword + synonyms), dispatches through a verb-handler table, and falls back to `CustomAction` assets — so the entire verb surface is data-driven.
+The parser resolves the typed verb through the `Action` catalog (keyword + synonyms), dispatches through a verb-handler table, and falls back to `CombatAction` then `CustomAction` assets — so the entire verb surface is data-driven.
 
 ---
 
@@ -173,7 +176,9 @@ The parser resolves the typed verb through the `Action` catalog (keyword + synon
 Assets/
 ├── TextAdventureEngine/
 │   ├── Runtime/          Engine code (TextEngine namespace, TextEngine.Runtime asmdef)
-│   ├── Editor/           Custom inspectors + World Map / Flag / Scenario windows
+│   ├── Editor/           Custom inspectors + graph editors / validator / tool windows
+│   ├── Tests/            EditMode test suite (TextEngine.Tests asmdef)
+│   ├── Documentation/    Manual + store listing
 │   └── Demo/
 │       ├── Resources/    The demo game's content (see authoring table above)
 │       ├── Scenes/       Demo scene + main menu
